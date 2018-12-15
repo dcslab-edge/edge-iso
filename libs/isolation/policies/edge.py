@@ -2,6 +2,8 @@
 
 import logging
 
+from typing import Set
+
 from .base import IsolationPolicy
 from .. import ResourceType
 from ..isolators import IdleIsolator, CycleLimitIsolator, FreqThrottleIsolator, SchedIsolator
@@ -10,8 +12,8 @@ from ...utils.machine_type import NodeType
 
 
 class EdgePolicy(IsolationPolicy):
-    def __init__(self, fg_wl: Workload, bg_wl: Workload) -> None:
-        super().__init__(fg_wl, bg_wl)
+    def __init__(self, fg_wl: Workload, bg_wls: Set[Workload]) -> None:
+        super().__init__(fg_wl, bg_wls)
 
         self._is_mem_isolated = False
 

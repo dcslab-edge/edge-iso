@@ -45,20 +45,19 @@ class PollingThread(Thread, metaclass=Singleton):
         logger = logging.getLogger('monitoring.workload_creation')
         logger.debug(f'{arr} is received from workload_creation queue')
 
-        if len(arr) != 7:
+        if len(arr) != 8:
             return
 
-        wl_identifier, wl_type, pid, perf_pid, perf_interval, tegra_pid, tegra_interval = arr
+        wl_identifier, wl_type, pid, perf_pid, perf_interval, tegra_pid, tegra_interval, max_workloads = arr
         pid = int(pid)
         perf_pid = int(perf_pid)
         perf_interval = int(perf_interval)
         item = wl_identifier.split('_')
         wl_name = item[0]
+        max_wls = int(max_workloads)
 
-        print("_cbk_wl_creation 1")
         if not psutil.pid_exists(pid):
             return
-        print("_cbk_wl_creation 2")
 
         workload = Workload(wl_name, wl_type, pid, perf_pid, perf_interval)
         if wl_type == 'bg':
@@ -66,7 +65,7 @@ class PollingThread(Thread, metaclass=Singleton):
         else:
             logger.info(f'{workload} is foreground process')
 
-        self._pending_wl.add(workload)
+        self._pending_wl.add(workload, max_wls)
 
         wl_queue_name = '{}({})'.format(wl_name, pid)
         ch.queue_declare(wl_queue_name)
