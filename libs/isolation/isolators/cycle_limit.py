@@ -42,8 +42,8 @@ class CycleLimitIsolator(Isolator):
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
         for bg_wl in self._background_wls:
-            logger.info(f'frequency of bound_cores of {bg_wl.name}\'s {bg_wl.bound_cores} is '
-                        f'{self._cur_step / 1_000_000}GHz')
+            logger.info(f'limit_percentages of bound_cores of {bg_wl.name}\'s {bg_wl.bound_cores} is '
+                        f'{self._cur_step}%')
 
         for bg_wl in self._background_wls:
             Cpu.limit_cycle_percentage(bg_wl.group_name, self._cur_step)
