@@ -1,7 +1,7 @@
 # coding: UTF-8
 
 import logging
-from typing import Optional
+from typing import Optional, Set
 
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
@@ -10,8 +10,8 @@ from ...workload import Workload
 
 
 class FreqThrottleIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wl: Workload) -> None:
-        super().__init__(foreground_wl, background_wl)
+    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
+        super().__init__(foreground_wl, background_wls)
 
         # FIXME: hard coded
         # Assumption: FG is latency-sensitive process (CPU) and BG is compute-intensive process (GPU)
@@ -44,7 +44,8 @@ class FreqThrottleIsolator(Isolator):
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
         freq = self._gpufreq_range[self._cur_step]
-        logger.info(f'frequency of bound_cores {self._background_wl.bound_cores} is {freq / 1_000_000_000}GHz')
+        for bg_wl in self._background_wls:
+            logger.info(f'frequency of bound_cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000_000}GHz')
         GPUDVFS.set_freq(freq)
 
     def reset(self) -> None:

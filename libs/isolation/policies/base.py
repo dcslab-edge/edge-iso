@@ -2,12 +2,12 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import ClassVar, Dict, Tuple, Type
+from typing import ClassVar, Dict, Tuple, Type, Set
 
 from .. import ResourceType
 from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, FreqThrottleIsolator, SchedIsolator
-#from ..isolators import CacheIsolator, IdleIsolator, Isolator, MemoryIsolator, SchedIsolator
-#from ..isolators.affinity import AffinityIsolator
+# from ..isolators import CacheIsolator, IdleIsolator, Isolator, MemoryIsolator, SchedIsolator
+# from ..isolators.affinity import AffinityIsolator
 from ...metric_container.basic_metric import BasicMetric, MetricDiff
 from ...workload import Workload
 from ...utils.machine_type import MachineChecker, NodeType
@@ -17,21 +17,21 @@ class IsolationPolicy(metaclass=ABCMeta):
     _IDLE_ISOLATOR: ClassVar[IdleIsolator] = IdleIsolator()
     _VERIFY_THRESHOLD: ClassVar[int] = 3
 
-    def __init__(self, fg_wl: Workload, bg_wl: Workload) -> None:
+    def __init__(self, fg_wl: Workload, bg_wls: Set[Workload]) -> None:
         self._fg_wl = fg_wl
-        self._bg_wl = bg_wl
+        self._bg_wls = bg_wls
 
         self._node_type = MachineChecker.get_node_type()
         # TODO: Discrete GPU case
         if self._node_type == NodeType.CPU:
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
-                (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wl)),
-                (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wl)),
+                (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wls)),
+                (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wls)),
             ))
         if self._node_type == NodeType.IntegratedGPU:
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
-                (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wl)),
-                (FreqThrottleIsolator, FreqThrottleIsolator(self._fg_wl, self._bg_wl)),
+                (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wls)),
+                (FreqThrottleIsolator, FreqThrottleIsolator(self._fg_wl, self._bg_wls)),
             ))
         self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR
         self._in_solorun_profile: bool = False
@@ -42,7 +42,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         return id(self)
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__} <fg: {self._fg_wl}, bg: {self._bg_wl}>'
+        return f'{self.__class__.__name__} <fg: {self._fg_wl}, bgs: {self._bg_wls}>'
 
     def __del__(self) -> None:
         isolators = tuple(self._isolator_map.keys())
@@ -66,7 +66,9 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         logger = logging.getLogger(__name__)
         logger.info(f'foreground : {metric_diff}')
-        logger.info(f'background : {self._bg_wl.calc_metric_diff()}')
+        # logger.info(f'backgrounds : {self._bg_wl.calc_metric_diff()}')
+        for idx, bg_wl in enumerate(self._bg_wls):
+            logger.info(f'background[{idx}] : {bg_wl.calc_metric_diff()}')
 
         resources = ((ResourceType.CACHE, metric_diff.llc_hit_ratio),
                      (ResourceType.MEMORY, metric_diff.local_mem_util_ps))
@@ -89,19 +91,26 @@ class IsolationPolicy(metaclass=ABCMeta):
             isolator.enforce()
 
     @property
-    def background_workload(self) -> Workload:
-        return self._bg_wl
+    def background_workloads(self) -> Set[Workload]:
+        return self._bg_wls
 
-    @background_workload.setter
-    def background_workload(self, new_workload: Workload):
-        self._bg_wl = new_workload
+    @background_workloads.setter
+    def background_workloads(self, new_workloads: Set[Workload]):
+        self._bg_wls = new_workloads
         for isolator in self._isolator_map.values():
-            isolator.change_bg_wl(new_workload)
+            isolator.change_bg_wls(new_workloads)
             isolator.enforce()
 
     @property
     def ended(self) -> bool:
-        return not self._fg_wl.is_running or not self._bg_wl.is_running
+        """
+        This returns true when the foreground workload is ended
+        """
+        if not self._fg_wl.is_running:
+            return True
+        else:
+            return False
+        # return not self._fg_wl.is_running or not self._bg_wls.all_is_running
 
     @property
     def cur_isolator(self) -> Isolator:
@@ -135,7 +144,8 @@ class IsolationPolicy(metaclass=ABCMeta):
         self._solorun_verify_violation_count = 0
 
         # suspend all workloads and their perf agents
-        self._bg_wl.pause()
+        for bg_wl in self._bg_wls:
+            bg_wl.pause()
 
         self._fg_wl.metrics.clear()
 
@@ -150,7 +160,7 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         logger = logging.getLogger(__name__)
         logger.debug(f'number of collected solorun data: {len(self._fg_wl.metrics)}')
-        self._fg_wl.avg_solorun_data = BasicMetric.calc_avg(self._fg_wl.metrics)
+        self._fg_wl.avg_solorun_data = BasicMetric.calc_avg(self._fg_wl.metrics, len(self._fg_wl.metrics))
         logger.debug(f'calculated average solorun data: {self._fg_wl.avg_solorun_data}')
 
         logger.debug('Enforcing restored configuration...')
@@ -161,7 +171,8 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         self._fg_wl.metrics.clear()
 
-        self._bg_wl.resume()
+        for bg_wl in self._bg_wls:
+            bg_wl.resume()
 
         self._in_solorun_profile = False
 
@@ -195,3 +206,27 @@ class IsolationPolicy(metaclass=ABCMeta):
     @property
     def safe_to_swap(self) -> bool:
         return not self._in_solorun_profile and len(self._fg_wl.metrics) > 0 and self._fg_wl.calc_metric_diff().verify()
+
+    # Multiple BGs related
+
+    def check_any_bg_running(self) -> bool:
+        not_running_bgs = 0
+        for bg_wl in self._bg_wls:
+            if bg_wl.is_running:
+                return True
+            elif not bg_wl.is_running:
+                not_running_bgs += 1
+        if not_running_bgs == len(self._bg_wls):
+            return False
+
+    def check_bg_wls_metrics(self) -> bool:
+        logger = logging.getLogger(__name__)
+        not_empty_metrics = 0
+        logger.info(f'len of self._bg_wls {len(self._bg_wls)}')
+        for bg_wl in self._bg_wls:
+            if len(bg_wl.metrics) > 0:
+                not_empty_metrics += 1
+            else:
+                return False
+        if not_empty_metrics == len(self._bg_wls):
+            return True

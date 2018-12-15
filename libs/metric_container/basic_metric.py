@@ -2,13 +2,14 @@
 
 from statistics import mean
 from typing import Iterable
+from itertools import islice
 
 from cpuinfo import cpuinfo
 from ..utils.machine_type import MachineChecker, NodeType
 
 NODE_TYPE = MachineChecker.get_node_type()
 
-#LLC_SIZE = int(cpuinfo.get_cpu_info()['l3_cache_size'].split()[0]) * 1024  # Xeon Server (BC5) LLC (L3 Cache)
+# LLC_SIZE = int(cpuinfo.get_cpu_info()['l3_cache_size'].split()[0]) * 1024  # Xeon Server (BC5) LLC (L3 Cache)
 if NODE_TYPE == NodeType.IntegratedGPU:
     LLC_SIZE = int(cpuinfo.get_cpu_info()['l2_cache_size'].split()[0]) * 1024   # JETSON TX2 LLC (L2Cache)
 elif NODE_TYPE == NodeType.CPU:
@@ -16,7 +17,8 @@ elif NODE_TYPE == NodeType.CPU:
 
 
 class BasicMetric:
-    def __init__(self, llc_references, llc_misses, inst, cycles, gpu_core_util, gpu_core_freq, gpu_emc_util, gpu_emc_freq, interval):
+    def __init__(self, llc_references, llc_misses, inst, cycles,
+                 gpu_core_util, gpu_core_freq, gpu_emc_util, gpu_emc_freq, interval):
         self._llc_references = llc_references
         self._llc_misses = llc_misses
         self._instructions = inst
@@ -28,18 +30,19 @@ class BasicMetric:
         self._interval = interval
 
     @classmethod
-    def calc_avg(cls, metrics: Iterable['BasicMetric']) -> 'BasicMetric':
-        return BasicMetric(
-                mean(metric._llc_references for metric in metrics),
-                mean(metric._llc_misses for metric in metrics),
-                mean(metric._instructions for metric in metrics),
-                mean(metric._cycles for metric in metrics),
-                mean(metric._gpu_core_util for metric in metrics),
-                mean(metric._gpu_core_freq for metric in metrics),
-                mean(metric._gpu_emc_util for metric in metrics),
-                mean(metric._gpu_emc_freq for metric in metrics),
-                mean(metric._interval for metric in metrics),
-        )
+    def calc_avg(cls, metrics: Iterable['BasicMetric'], metric_num: int) -> 'BasicMetric':
+            metrics = list(islice(metrics, 0, metric_num))
+            return BasicMetric(
+                    mean(metric._llc_references for metric in metrics),
+                    mean(metric._llc_misses for metric in metrics),
+                    mean(metric._instructions for metric in metrics),
+                    mean(metric._cycles for metric in metrics),
+                    mean(metric._gpu_core_util for metric in metrics),
+                    mean(metric._gpu_core_freq for metric in metrics),
+                    mean(metric._gpu_emc_util for metric in metrics),
+                    mean(metric._gpu_emc_freq for metric in metrics),
+                    mean(metric._interval for metric in metrics),
+            )
 
     @property
     def llc_references(self):
@@ -99,9 +102,9 @@ class BasicMetric:
 class MetricDiff:
     # FIXME: hard coded (CPU -> SDC Node, In. GPU -> Jetson TX2 Node)
     if NODE_TYPE == NodeType.IntegratedGPU:
-        _MAX_MEM_BANDWIDTH_PS = 50 * 1024 * 1024 * 1024     ## MemBW specified in Jetson TX2 docs
+        _MAX_MEM_BANDWIDTH_PS = 50 * 1024 * 1024 * 1024     # MemBW specified in Jetson TX2 docs
     if NODE_TYPE == NodeType.CPU:
-        _MAX_MEM_BANDWIDTH_PS = 24 * 1024 * 1024 * 1024     ## MemBW measured by Intel VTune
+        _MAX_MEM_BANDWIDTH_PS = 24 * 1024 * 1024 * 1024     # MemBW measured by Intel VTune
 
     def __init__(self, curr: BasicMetric, prev: BasicMetric, core_norm: float = 1) -> None:
         self._llc_hit_ratio = curr.llc_hit_ratio - prev.llc_hit_ratio

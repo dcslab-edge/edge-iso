@@ -12,39 +12,47 @@ class PendingQueue(Sized):
     def __init__(self, policy_type: Type[IsolationPolicy]) -> None:
         self._policy_type: Type[IsolationPolicy] = policy_type
 
-        self._bg_q: Dict[Tuple[int, ...], Workload] = dict()
+        # self._bg_q: Dict[Tuple[int, ...], Workload] = dict()
+        self._bg_q_list: List[Dict[Tuple[int, ...], Workload]] = list(dict())
         self._fg_q: Dict[Tuple[int, ...], Workload] = dict()
-        self._ready_queue: DefaultDict[int, List[Workload]] = defaultdict(list)
-        self._pending_list: List[IsolationPolicy] = list()
+        self._ready_queues: DefaultDict[int, List[Workload]] = defaultdict(list)    # ready_queue per socket
+        self._pending_list: List[IsolationPolicy] = list()                          # pending workload pairs
+        self._first_pending: bool = True
 
     def __len__(self) -> int:
-        return len(tuple(
-                filter(lambda x: len(x.foreground_workload.metrics) > 0 and len(x.background_workload.metrics) > 0,
-                       self._pending_list)))
+        pending_queue_len = len(tuple(
+            filter(lambda x: len(x.foreground_workload.metrics) > 0 and x.check_bg_wls_metrics(), self._pending_list)))
+        #print(f'pending_queue_len: {pending_queue_len}, self._pending_list: {self._pending_list}')
+        return pending_queue_len
+        #return len(tuple(
+        #        filter(lambda x: len(x.foreground_workload.metrics) > 0 and x.check_bg_wls_metrics(),
+        #               self._pending_list)))
 
-    def add(self, workload: Workload) -> None:
+    def add(self, workload: Workload, max_workloads: int) -> None:
         logger = logging.getLogger('monitoring.pending_queue')
         logger.info(f'{workload} is ready for active')
 
         # FIXME: hard coded : Workload always locate on the socket 0
         # ready_queue = self._ready_queue[workload.cur_socket_id()]
-        ready_queue = self._ready_queue[0]
+        ready_queue = self._ready_queues[0]
         ready_queue.append(workload)
 
-        # FIXME: hard coded (The below code is for multi-socket initial placements)
-        if len(ready_queue) is 2 and ready_queue[0].wl_type != ready_queue[1].wl_type:
-            if ready_queue[0].wl_type == 'fg':
-                fg = ready_queue[0]
-                bg = ready_queue[1]
-            else:
-                fg = ready_queue[1]
-                bg = ready_queue[0]
-
-            new_group = self._policy_type(fg, bg)
+        # Here, max_workloads is the `bench` numbers specified in bench_launcher's experiments config.json
+        print(f'ready_queue: {ready_queue}, len_ready_queue: {len(ready_queue)}, max_workloads: {max_workloads}')
+        if len(ready_queue) == max_workloads and self._first_pending:
+            fg_wl = None
+            bg_wls = set()
+            for workload in ready_queue:
+                if workload.wl_type == 'fg':
+                    fg_wl = workload
+                else:
+                    bg_wls.add(workload)
+            new_group = self._policy_type(fg_wl, bg_wls)
             self._pending_list.append(new_group)
-
-            self._ready_queue[0] = list()
-            #self._ready_queue[workload.cur_socket_id()] = list()
+            self._ready_queues[0] = list()
+            self._first_pending = False
+        # elif not self._first_pending:
+            # Add additional workload(s) into current group after
 
     def pop(self) -> IsolationPolicy:
         if len(self) is 0:

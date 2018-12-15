@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Optional, Set
 
 from .. import NextStep
 from ...metric_container.basic_metric import MetricDiff
@@ -13,14 +13,15 @@ class Isolator(metaclass=ABCMeta):
     _DOD_THRESHOLD: ClassVar[float] = 0.005
     _FORCE_THRESHOLD: ClassVar[float] = 0.05
 
-    def __init__(self, foreground_wl: Workload, background_wl: Workload) -> None:
+    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
         self._prev_metric_diff: MetricDiff = None
 
         self._foreground_wl = foreground_wl
-        self._background_wl = background_wl
+        self._background_wls = background_wls
 
+        # FIXME: All BGs have same NextStep (All BGs are homogeneous)
         self._fg_next_step = NextStep.IDLE
-        self._bg_next_step = NextStep.IDLE
+        self._bg_next_steps = NextStep.IDLE
 
         self._is_first_decision: bool = True
 
@@ -145,8 +146,8 @@ class Isolator(metaclass=ABCMeta):
         self._foreground_wl = new_workload
         self._prev_metric_diff = new_workload.calc_metric_diff()
 
-    def change_bg_wl(self, new_workload: Workload) -> None:
-        self._background_wl = new_workload
+    def change_bg_wls(self, new_workloads: Set[Workload]) -> None:
+        self._background_wls = new_workloads
 
     @abstractmethod
     def store_cur_config(self) -> None:

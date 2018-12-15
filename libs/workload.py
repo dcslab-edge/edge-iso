@@ -87,6 +87,10 @@ class Workload:
         return self._metrics
 
     @property
+    def num_cores(self) -> int:
+        return len(self.bound_cores)
+
+    @property
     def bound_cores(self) -> Tuple[int, ...]:
         return tuple(self._cgroup_cpuset.read_cpus())
 

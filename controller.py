@@ -123,19 +123,21 @@ class Controller:
         logger = logging.getLogger(__name__)
 
         ended = tuple(filter(lambda g: g.ended, self._isolation_groups))
-
+        """
         for group in ended:
             if group.foreground_workload.is_running:
                 ended_workload = group.background_workload
             else:
                 ended_workload = group.foreground_workload
             logger.info(f'{group} of {ended_workload.name} is ended')
-
+        """
+        for group in ended:
             # remove from containers
             group.reset()
             del self._isolation_groups[group]
             if group.in_solorun_profiling:
-                group.background_workload.resume()
+                for bg_wl in group.background_workloads:
+                    bg_wl.resume()
                 del self._solorun_count[group]
 
     def run(self) -> None:
