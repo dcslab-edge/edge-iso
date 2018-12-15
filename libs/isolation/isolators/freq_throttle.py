@@ -45,7 +45,7 @@ class FreqThrottleIsolator(Isolator):
         logger = logging.getLogger(__name__)
         freq = self._gpufreq_range[self._cur_step]
         for bg_wl in self._background_wls:
-            logger.info(f'frequency of bound_cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000_000}GHz')
+            logger.info(f'frequency of GPU cores of {bg_wl.name}\'s {bg_wl.} is {freq / 1_000_000_000}GHz')
         GPUDVFS.set_freq(freq)
 
     def reset(self) -> None:
