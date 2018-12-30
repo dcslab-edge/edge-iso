@@ -32,8 +32,9 @@ class PollingThread(Thread, metaclass=Singleton):
         self._metric_buf_size = metric_buf_size
         self._node_type = MachineChecker.get_node_type()
 
-        self._rmq_host = 'localhost'
-        self._rmq_creation_queue = 'workload_creation'
+        self._rmq_host = 'sdc2'
+        self._rmq_creation_exchange = f'workload_creation{self._rmq_host}'
+        self._rmq_bench_exchange = ''
 
         self._pending_wl = pending_queue
 
@@ -67,8 +68,11 @@ class PollingThread(Thread, metaclass=Singleton):
 
         self._pending_wl.add(workload, max_wls)
 
-        wl_queue_name = '{}({})'.format(wl_name, pid)
+        wl_queue_name = 'rmq-{}-{}({})'.format(self._rmq_host, wl_name, pid)
+        ch.exchange_declare(exchange=self._rmq_creation_exchange, exchange_type='fanout')
         ch.queue_declare(wl_queue_name)
+        self._rmq_bench_exchange = f'ex-{self._rmq_host}-{wl_name}({pid})'
+        ch.queue_bind(exchange=self._rmq_bench_exchange, queue=wl_queue_name)
         ch.basic_consume(functools.partial(self._cbk_wl_monitor, workload), wl_queue_name)
 
     def _cbk_wl_monitor(self, workload: Workload,
@@ -110,8 +114,13 @@ class PollingThread(Thread, metaclass=Singleton):
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=self._rmq_host))
         channel = connection.channel()
 
-        channel.queue_declare(self._rmq_creation_queue)
-        channel.basic_consume(self._cbk_wl_creation, self._rmq_creation_queue)
+        channel.exchange_declare(exchange=self._rmq_creation_exchange, exchange_type='fanout')
+        # Making a random queue
+        result = channel.queue_declare(exclusive=True)
+        queue_name = result.method.queue
+        # channel.queue_bind(exchange=self._rmq_creation_exchange, queue=)
+        channel.queue_bind(exchange=self._rmq_creation_exchange, queue=queue_name)
+        channel.basic_consume(self._cbk_wl_creation, queue_name)
 
         try:
             logger = logging.getLogger('monitoring')
