@@ -138,8 +138,8 @@ class Controller:
                 ended_workload = group.foreground_workload
             logger.info(f'{group} of {ended_workload.name} is ended')
         """
-        print("ended groups:")
-        print(ended)
+        #print("ended groups:")
+        #print(ended)
         for group in ended:
             # remove from containers
             group.reset()

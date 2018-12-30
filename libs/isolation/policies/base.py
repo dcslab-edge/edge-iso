@@ -136,7 +136,7 @@ class IsolationPolicy(metaclass=ABCMeta):
 
     def reset(self) -> None:
         for isolator in self._isolator_map.values():
-            print(isolator)
+            #print(isolator)
             isolator.reset()
 
     # Solorun profiling related
