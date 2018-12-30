@@ -19,6 +19,7 @@ class Workload:
     """
 
     def __init__(self, name: str, wl_type: str, pid: int, perf_pid: int, perf_interval: int) -> None:
+        #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
         self._wl_type = wl_type
         self._pid = pid

@@ -106,10 +106,20 @@ class IsolationPolicy(metaclass=ABCMeta):
         """
         This returns true when the foreground workload is ended
         """
-        if not self._fg_wl.is_running:
-            return True
-        else:
-            return False
+        ret:bool = True
+        new_bg_wls:Set[Workload] = set()
+
+        for wl in self._bg_wls :
+            ret = ret and (not wl.is_running)
+            if wl.is_running:
+               new_bg_wls.add(wl)
+        self._bg_wls = new_bg_wls
+        return not self._fg_wl.is_running or ret
+        #
+        # if not self._fg_wl.is_running:
+        #     return True
+        # else:
+        #     return False
         # return not self._fg_wl.is_running or not self._bg_wls.all_is_running
 
     @property
@@ -126,6 +136,7 @@ class IsolationPolicy(metaclass=ABCMeta):
 
     def reset(self) -> None:
         for isolator in self._isolator_map.values():
+            print(isolator)
             isolator.reset()
 
     # Solorun profiling related
@@ -135,6 +146,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         return self._in_solorun_profile
 
     def start_solorun_profiling(self) -> None:
+        #print("solorun starting")
         """ profile solorun status of a workload """
         if self._in_solorun_profile:
             raise ValueError('Stop the ongoing solorun profiling first!')
@@ -155,6 +167,7 @@ class IsolationPolicy(metaclass=ABCMeta):
             isolator.reset()
 
     def stop_solorun_profiling(self) -> None:
+        #print("solorun stopping")
         if not self._in_solorun_profile:
             raise ValueError('Start solorun profiling first!')
 
@@ -168,7 +181,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         for isolator in self._isolator_map.values():
             isolator.load_cur_config()
             isolator.enforce()
-
+        #print(self._fg_wl.metrics)
         self._fg_wl.metrics.clear()
 
         for bg_wl in self._bg_wls:
@@ -227,6 +240,8 @@ class IsolationPolicy(metaclass=ABCMeta):
             if len(bg_wl.metrics) > 0:
                 not_empty_metrics += 1
             else:
+                logger.info(f'return False')
                 return False
         if not_empty_metrics == len(self._bg_wls):
+            logger.info(f'return True')
             return True

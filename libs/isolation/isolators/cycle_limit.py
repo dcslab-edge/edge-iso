@@ -49,6 +49,8 @@ class CycleLimitIsolator(Isolator):
             Cpu.limit_cycle_percentage(bg_wl.group_name, self._cur_step)
 
     def reset(self) -> None:
+        print("cycle_limit reset")
+        print(self._background_wls)
         for bg_wl in self._background_wls:
             Cpu.limit_cycle_percentage(bg_wl.group_name, Cpu.MAX_PERCENT)
 
