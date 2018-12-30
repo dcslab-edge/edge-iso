@@ -45,8 +45,14 @@ class Controller:
         for group, iteration_num in self._isolation_groups.items():
             logger.info('')
             logger.info(f'***************isolation of {group.name} #{iteration_num}***************')
-
+            #print(group.in_solorun_profiling)
             try:
+                #print("============val debug=============")
+                #if group.in_solorun_profiling:
+                    #print(self._solorun_count[group])
+                #print(int(self._solorun_interval / self._interval))
+
+                #print(group.profile_needed())
                 if group.in_solorun_profiling:
                     if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
                         logger.info('Stopping solorun profiling...')
@@ -70,6 +76,7 @@ class Controller:
                     continue
 
                 if group.new_isolator_needed:
+                    #print(group)
                     group.choose_next_isolator()
 
                 cur_isolator: Isolator = group.cur_isolator
@@ -131,6 +138,8 @@ class Controller:
                 ended_workload = group.foreground_workload
             logger.info(f'{group} of {ended_workload.name} is ended')
         """
+        #print("ended groups:")
+        #print(ended)
         for group in ended:
             # remove from containers
             group.reset()

@@ -32,6 +32,7 @@ class EdgePolicy(IsolationPolicy):
         *  Desktop   : ResourceType.Cache -> CycleLimitIsolator, ResourceType.Memory -> SchedIsolator
         * 
         """
+
         for resource, diff_value in self.contentious_resources():
             if resource is ResourceType.CACHE:
                     isolator = self._isolator_map[CycleLimitIsolator]
