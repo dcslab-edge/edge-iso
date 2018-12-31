@@ -14,8 +14,8 @@ from ...utils.machine_type import NodeType
 class EdgePolicy(IsolationPolicy):
     def __init__(self, fg_wl: Workload, bg_wls: Set[Workload]) -> None:
         super().__init__(fg_wl, bg_wls)
-
         self._is_mem_isolated = False
+        self._is_freq_throttled_max = False
 
     @property
     def new_isolator_needed(self) -> bool:
@@ -39,6 +39,8 @@ class EdgePolicy(IsolationPolicy):
             elif resource is ResourceType.MEMORY:
                 if self._node_type == NodeType.IntegratedGPU:
                     isolator = self._isolator_map[FreqThrottleIsolator]
+                    if isolator.is_max_level is True:
+                        isolator = self._isolator_map[SchedIsolator]
                 elif self._node_type == NodeType.CPU:
                     isolator = self._isolator_map[SchedIsolator]
             else:
