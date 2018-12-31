@@ -33,7 +33,7 @@ class PollingThread(Thread, metaclass=Singleton):
         self._node_type = MachineChecker.get_node_type()
 
         # FIXME: hard-coded `self._rmq_host`
-        self._rmq_host = 'sdc2'
+        self._rmq_host = 'jetson2'
         self._rmq_creation_exchange = f'workload_creation({self._rmq_host})'
         self._rmq_bench_exchange = ''
 

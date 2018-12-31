@@ -32,6 +32,7 @@ class IsolationPolicy(metaclass=ABCMeta):
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
                 (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wls)),
                 (FreqThrottleIsolator, FreqThrottleIsolator(self._fg_wl, self._bg_wls)),
+                (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wls))
             ))
         self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR
         self._in_solorun_profile: bool = False
