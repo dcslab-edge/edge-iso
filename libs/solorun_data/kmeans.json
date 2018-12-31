@@ -4,5 +4,9 @@
     "llc_references": 2007373.086124402,
     "llc_misses": 853098.8995215311,
     "instructions": 12823317669.306221,
-    "cycles": 5267889581.578947
+    "cycles": 5267889581.578947,
+    "gpu_core_util": 0,
+    "gpu_core_freq": 0,
+    "gpu_emc_util": 0,
+    "gpu_emc_freq": 0
 }
