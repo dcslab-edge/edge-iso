@@ -1,0 +1,8 @@
+{
+    "name": "particlefilter",
+    "runtime": 165.73934030532837,
+    "llc_references": 196970178.47272727,
+    "llc_misses": 32734.70303030303,
+    "instructions": 13707680528.030302,
+    "cycles": 4824180352.042424
+}

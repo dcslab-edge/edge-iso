@@ -112,7 +112,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         for wl in self._bg_wls :
             ret = ret and (not wl.is_running)
             if wl.is_running:
-               new_bg_wls.add(wl)
+                new_bg_wls.add(wl)
         self._bg_wls = new_bg_wls
         return not self._fg_wl.is_running or ret
         #

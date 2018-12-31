@@ -32,8 +32,9 @@ class PollingThread(Thread, metaclass=Singleton):
         self._metric_buf_size = metric_buf_size
         self._node_type = MachineChecker.get_node_type()
 
+        # FIXME: hard-coded `self._rmq_host`
         self._rmq_host = 'sdc2'
-        self._rmq_creation_exchange = f'workload_creation{self._rmq_host}'
+        self._rmq_creation_exchange = f'workload_creation({self._rmq_host})'
         self._rmq_bench_exchange = ''
 
         self._pending_wl = pending_queue

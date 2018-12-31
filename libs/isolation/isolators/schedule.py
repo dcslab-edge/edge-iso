@@ -20,12 +20,15 @@ class SchedIsolator(Isolator):
         if self._node_type == NodeType.IntegratedGPU:
             self._MAX_CORES = 4
         elif self._node_type == NodeType.CPU:
-            self._MAX_CORES = 8
+            self._MAX_CORES = 4
 
         # TODO: Currently all BGs have same number of cores (self._cur_step)
         # self._bg_wl = self._bgs_list[0]
         # self._num_of_bg_wls = len(self._bgs_list)
-        self._cur_step: Dict[Workload, int] = [(bg_wl, bg_wl.num_cores) for bg_wl in self._bgs_list]
+        self._cur_step: Dict[Workload, int] = dict()
+        for bg_wl in self._bgs_list:
+            self._cur_step[bg_wl] = bg_wl.num_cores
+        # self._cur_step: Dict[Workload, int] = [(bg_wl, bg_wl.num_cores) for bg_wl in self._bgs_list]
 
         self._target_bg: Workload = None        # The target bg for re-assigning bounded cores
         self._max_mem_bg: Workload = None
@@ -70,7 +73,7 @@ class SchedIsolator(Isolator):
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
         # FIXME: hard coded
-        self._target_bg.bound_cores = range(self._target_bg.bound_cores[0]+1, self._target_bg.bound_cores[-1])
+        self._target_bg.bound_cores = range(self._target_bg.bound_cores[0], self._target_bg.bound_cores[-1]+1)
         for bg_wl, bg_cores in self._cur_step.items():
             logger.info(f'affinity of background [{bg_wl.group_name}] is {bg_wl.bound_cores}')
 
@@ -86,6 +89,7 @@ class SchedIsolator(Isolator):
         super().load_cur_config()
 
         self._cur_step = self._stored_config
+        self.update_max_membw_bg()
         self._stored_config = None
 
     def update_max_membw_bg(self) -> None:
@@ -100,6 +104,8 @@ class SchedIsolator(Isolator):
                 max_membw_bg = bg_wl
         self._max_mem_bg = max_membw_bg
         self._target_bg = max_membw_bg
+        print(f'self._max_mem_bg : {self._max_mem_bg}')
+        print(f'self._target_bg : {self._target_bg}')
 
     def update_min_cores_bg(self) -> None:
         min_cores = -1
