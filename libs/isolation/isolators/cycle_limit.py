@@ -19,7 +19,8 @@ class CycleLimitIsolator(Isolator):
 
     @classmethod
     def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
-        return metric_diff.local_mem_util_ps
+        return metric_diff.llc_hit_ratio
+        #return metric_diff.local_mem_util_ps
 
     def strengthen(self) -> 'CycleLimitIsolator':
         self._cur_step -= Cpu.STEP

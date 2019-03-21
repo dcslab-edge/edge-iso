@@ -1,0 +1,12 @@
+{
+    "name": "alexnet-train-gpu",
+    "runtime": 205.9679503440857,
+    "llc_references": 88717177.43975905,
+    "llc_misses": 18938828.55421687,
+    "instructions": 3701950184.061245,
+    "cycles": 3500125183.70984,
+    "gpu_core_util": 409.84437751004015,
+    "gpu_core_freq": 6500.0,
+    "gpu_emc_util": 150.60240963855424,
+    "gpu_emc_freq": 9330.0
+}

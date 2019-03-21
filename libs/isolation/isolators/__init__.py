@@ -1,7 +1,7 @@
 # coding: UTF-8
 
 
-#from .affinity import AffinityIsolator
+from .affinity import AffinityIsolator
 from .base import Isolator
 #from .cache import CacheIsolator
 #from .core import CoreIsolator

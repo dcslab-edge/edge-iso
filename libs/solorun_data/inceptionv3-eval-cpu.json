@@ -1,0 +1,12 @@
+{
+    "name": "inceptionv3-eval-cpu",
+    "runtime": 348.2811646461487,
+    "llc_references": 95843503.77934271,
+    "llc_misses": 5603223.224765258,
+    "instructions": 2817462057.1566906,
+    "cycles": 2633125477.987089,
+    "gpu_core_util": 0.5516431924882629,
+    "gpu_core_freq": 6500.0,
+    "gpu_emc_util": 4.175469483568075,
+    "gpu_emc_freq": 9330.0
+}
