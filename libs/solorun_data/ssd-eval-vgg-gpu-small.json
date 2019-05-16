@@ -1,0 +1,12 @@
+{
+  "name": "ssd-eval-vgg-gpu-small",
+  "runtime": 80.86966133117676,
+  "llc_references": 45159871.530612245,
+  "llc_misses": 2494043.673469388,
+  "instructions": 940310448.0612245,
+  "cycles": 1181620612.7933674,
+  "gpu_core_util": 204.93622448979593,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 38.01020408163265,
+  "gpu_emc_freq": 9330
+}

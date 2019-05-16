@@ -1,0 +1,12 @@
+{
+  "name": "ssd-eval-vgg-gpu-original",
+  "runtime": 100.48353433609009,
+  "llc_references": 60789447.75614754,
+  "llc_misses": 2251198.9344262294,
+  "instructions": 894794429.6618853,
+  "cycles": 1353293123.5963116,
+  "gpu_core_util": 197.27459016393442,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 30.686475409836067,
+  "gpu_emc_freq": 9330
+}

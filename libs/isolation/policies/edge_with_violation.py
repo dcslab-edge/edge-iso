@@ -5,7 +5,8 @@ from typing import ClassVar, Set
 
 from .edge import EdgePolicy
 from .. import ResourceType
-from ..isolators import IdleIsolator, CycleLimitIsolator, FreqThrottleIsolator, SchedIsolator, AffinityIsolator
+from ..isolators import IdleIsolator, CycleLimitIsolator, CPUFreqThrottleIsolator, \
+    GPUFreqThrottleIsolator, SchedIsolator, AffinityIsolator
 from ...workload import Workload
 from ...utils.machine_type import NodeType
 
@@ -23,10 +24,15 @@ class EdgeWViolationPolicy(EdgePolicy):
             return False
 
         resource: ResourceType = self.contentious_resource()
-        if self._node_type == NodeType.IntegratedGPU:
+        if self._node_type == NodeType.IntegratedGPU and self.foreground_workload.is_gpu_task == 0:
             return \
                 resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
-                or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, FreqThrottleIsolator)
+                or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, GPUFreqThrottleIsolator)
+                                                            or isinstance(self._cur_isolator, SchedIsolator))
+        elif self._node_type == NodeType.IntegratedGPU and self.foreground_workload.is_gpu_task == 1:
+            return \
+                resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+                or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, CPUFreqThrottleIsolator)
                                                             or isinstance(self._cur_isolator, SchedIsolator))
         
     @property

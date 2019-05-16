@@ -1,0 +1,12 @@
+{
+  "name": "ssd-train-vgg-cpu",
+  "runtime": 202.3082287311554,
+  "llc_references": 76927059.69666329,
+  "llc_misses": 3750452.588473205,
+  "instructions": 4919097595.485338,
+  "cycles": 3953298491.274014,
+  "gpu_core_util": 0.8442871587462084,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 2.4974721941354905,
+  "gpu_emc_freq": 9330
+}

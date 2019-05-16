@@ -9,4 +9,5 @@ from .idle import IdleIsolator
 #from .cycle_limit import MemoryIsolator
 from .schedule import SchedIsolator
 from .cycle_limit import CycleLimitIsolator
-from .freq_throttle import FreqThrottleIsolator
+from .cpu_freq_throttle import CPUFreqThrottleIsolator
+from .gpu_freq_throttle import GPUFreqThrottleIsolator

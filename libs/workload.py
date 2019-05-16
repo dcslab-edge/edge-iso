@@ -3,12 +3,14 @@
 from collections import deque
 from itertools import chain
 from typing import Deque, Iterable, Optional, Set, Tuple
+from pathlib import Path
 
 import psutil
+import subprocess
 
 from .metric_container.basic_metric import BasicMetric, MetricDiff
 from .solorun_data.datas import data_map
-from .utils import DVFS, GPUDVFS  # , ResCtrl, numa_topology
+from .utils import CPUDVFS, GPUDVFS  # , ResCtrl, numa_topology
 from .utils.cgroup import Cpu, CpuSet
 
 
@@ -22,6 +24,8 @@ class Workload:
         #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
         self._wl_type = wl_type
+        self._is_gpu_task = 0  # if yes, set to 1, otherwise set to 0.
+
         self._pid = pid
         self._metrics: Deque[BasicMetric] = deque()
         self._perf_pid = perf_pid
@@ -33,7 +37,7 @@ class Workload:
         self._cgroup_cpuset = CpuSet(self.group_name)
         self._cgroup_cpu = Cpu(self.group_name)
         #self._resctrl = ResCtrl(self.group_name)
-        self._dvfs = DVFS(self.group_name)
+        self._cpu_dvfs = CPUDVFS(self.group_name)
         self._gpu_dvfs = GPUDVFS(self.group_name)
 
         # This variable is used to contain the recent avg. status
@@ -64,8 +68,12 @@ class Workload:
     #     return self._resctrl
 
     @property
-    def dvfs(self) -> DVFS:
-        return self._dvfs
+    def is_gpu_task(self) -> int:
+        return self._is_gpu_task
+
+    @property
+    def cpu_dvfs(self) -> CPUDVFS:
+        return self._cpu_dvfs
 
     @property
     def gpu_dvfs(self) -> GPUDVFS:
@@ -162,6 +170,37 @@ class Workload:
             ))
         except psutil.NoSuchProcess:
             return tuple()
+
+    def check_gpu_task(self) -> None:
+        # gpu_mem_path = '/sys/kernel/debug/nvmap/iovmm/clients'
+        try:
+            lines = subprocess.check_output("sudo cat /sys/kernel/debug/nvmap/iovmm/clients | awk \'{print $3}\'",
+                                            shell=True)
+            pids = lines.split().decode().split()
+            for pid in pids:
+                if pid == str(self.pid):
+                    self._is_gpu_task = 1
+                    break
+            self._is_gpu_task = 0
+        except (ValueError, IndexError, AttributeError):
+            self._is_gpu_task = 0
+
+
+    """
+    def check_gpu_task(self) -> None:
+        gpu_mem_path = Path('/sys/kernel/debug/nvmap/iovmm/clients')
+        try:
+            with gpu_mem_path.open() as fp:
+                line = fp.readline()
+                while line is not None:
+                    pid = line.split()[2]
+                    line = fp.readline()
+                    if pid == self.pid:
+                        self._is_gpu_task = 1
+                        break
+        except (ValueError, IndexError):
+            self._is_gpu_task = 0
+    """
 
     """
     def cur_socket_id(self) -> int:

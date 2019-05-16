@@ -5,7 +5,8 @@ from abc import ABCMeta, abstractmethod
 from typing import ClassVar, Dict, Tuple, Type, Set
 
 from .. import ResourceType
-from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, FreqThrottleIsolator, SchedIsolator, AffinityIsolator
+from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, \
+GPUFreqThrottleIsolator, CPUFreqThrottleIsolator, SchedIsolator, AffinityIsolator
 # from ..isolators import CacheIsolator, IdleIsolator, Isolator, MemoryIsolator, SchedIsolator
 # from ..isolators.affinity import AffinityIsolator
 from ...metric_container.basic_metric import BasicMetric, MetricDiff
@@ -32,7 +33,8 @@ class IsolationPolicy(metaclass=ABCMeta):
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
                 (AffinityIsolator, AffinityIsolator(self._fg_wl, self._bg_wls)),
                 (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wls)),
-                (FreqThrottleIsolator, FreqThrottleIsolator(self._fg_wl, self._bg_wls)),
+                (CPUFreqThrottleIsolator, CPUFreqThrottleIsolator(self._fg_wl, self._bg_wls)),
+                (GPUFreqThrottleIsolator, GPUFreqThrottleIsolator(self._fg_wl, self._bg_wls)),
                 (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wls))
             ))
         self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR
@@ -112,10 +114,10 @@ class IsolationPolicy(metaclass=ABCMeta):
         """
         This returns true when the foreground workload is ended
         """
-        ret:bool = True
-        new_bg_wls:Set[Workload] = set()
+        ret: bool = True
+        new_bg_wls: Set[Workload] = set()
 
-        for wl in self._bg_wls :
+        for wl in self._bg_wls:
             ret = ret and (not wl.is_running)
             if wl.is_running:
                 new_bg_wls.add(wl)
