@@ -39,9 +39,10 @@ class Controller:
 
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
 
-        self._cpuset = CpuSet('EdgeIso-controller')
-        self._cpuset.create_group()
-        self._cpuset.assign_cpus(binding_cores)
+        self._cpuset = CpuSet('EdgeIso')
+        self._binding_cores = binding_cores
+        #self._cpuset.create_group()
+        #self._cpuset.assign_cpus(binding_cores)
 
         # Swapper init
         # self._swapper: SwapIsolator = SwapIsolator(self._isolation_groups)
@@ -157,6 +158,10 @@ class Controller:
                 del self._solorun_count[group]
 
     def run(self) -> None:
+
+        self._cpuset.create_group()
+        self._cpuset.assign_cpus(self._binding_cores)
+
         self._polling_thread.start()
 
         logger = logging.getLogger(__name__)
