@@ -40,6 +40,7 @@ class Controller:
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
 
         self._cpuset = CpuSet('EdgeIso-controller')
+        self._cpuset.create_group()
         self._cpuset.assign_cpus(binding_cores)
 
         # Swapper init
