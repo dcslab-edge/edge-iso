@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 import psutil
 
@@ -19,12 +19,15 @@ from libs.isolation.policies import EdgePolicy, EdgeWViolationPolicy, IsolationP
 # from libs.isolation.swapper import SwapIsolator
 from pending_queue import PendingQueue
 from polling_thread import PollingThread
+from libs.utils.hyphen import convert_to_set
+from libs.utils.cgroup.cpuset import CpuSet
+
 
 MIN_PYTHON = (3, 6)
 
 
 class Controller:
-    def __init__(self, metric_buf_size: int) -> None:
+    def __init__(self, metric_buf_size: int, binding_cores: Set[int]) -> None:
         self._pending_queue: PendingQueue = PendingQueue(EdgeWViolationPolicy)
 
         self._interval: float = 0.2  # scheduling interval (sec)
@@ -35,6 +38,9 @@ class Controller:
         self._isolation_groups: Dict[IsolationPolicy, int] = dict()
 
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
+
+        self._cpuset = CpuSet('EdgeIso-controller')
+        self._cpuset.assign_cpus(binding_cores)
 
         # Swapper init
         # self._swapper: SwapIsolator = SwapIsolator(self._isolation_groups)
@@ -167,6 +173,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Run workloads that given by parameter.')
     parser.add_argument('-b', '--metric-buf-size', dest='buf_size', default='50', type=int,
                         help='metric buffer size per thread. (default : 50)')
+    parser.add_argument('-c', '--binding-cores', dest='cores', default='4,5', type=str,
+                        help='binding cores ids where controller runs on. (default: 4,5 where bg tasks run on)')
 
     os.makedirs('logs', exist_ok=True)
 
@@ -193,7 +201,8 @@ def main() -> None:
     monitoring_logger.addHandler(stream_handler)
     monitoring_logger.addHandler(file_handler)
 
-    controller = Controller(args.buf_size)
+    binding_cores: Set[int] = convert_to_set(args.cores)
+    controller = Controller(args.buf_size, binding_cores)
     controller.run()
 
 
