@@ -62,7 +62,7 @@ class PollingThread(Thread, metaclass=Singleton):
             return
 
         workload = Workload(wl_name, wl_type, pid, perf_pid, perf_interval)
-        workload.check_gpu_task()
+        #workload.check_gpu_task()
         if wl_type == 'bg':
             logger.info(f'{workload} is background process')
         else:

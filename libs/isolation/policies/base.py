@@ -168,7 +168,7 @@ class IsolationPolicy(metaclass=ABCMeta):
             bg_wl.pause()
 
         self._fg_wl.metrics.clear()
-
+        #self.foreground_workload.check_gpu_task()
         # store current configuration
         for isolator in self._isolator_map.values():
             isolator.store_cur_config()

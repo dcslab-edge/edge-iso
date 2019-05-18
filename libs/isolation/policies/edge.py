@@ -46,7 +46,7 @@ class EdgePolicy(IsolationPolicy):
             if resource is ResourceType.CACHE:
                     isolator = self._isolator_map[CycleLimitIsolator]
             elif resource is ResourceType.MEMORY:
-                self.foreground_workload.check_gpu_task()
+                #self.foreground_workload.check_gpu_task()
                 if self._node_type == NodeType.IntegratedGPU:
                     if self.foreground_workload.is_gpu_task == 1:   # if fg is gpu task, ...
                     # FIXME: choosing an isolator by considering whether the FG task using GPU or not.

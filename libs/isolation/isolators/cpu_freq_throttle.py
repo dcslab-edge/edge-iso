@@ -46,7 +46,7 @@ class CPUFreqThrottleIsolator(Isolator):
         freq = self._cpufreq_range[self._cur_step]
         # FIXME: It assumes all bgs are running on a single CPU socket, so we throttle freq.s for the one bg
         for bg_wl in self._background_wls:
-            logger.info(f'frequency of CPU cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000_000}GHz')
+            logger.info(f'frequency of CPU cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000}GHz')
             bg_wl.cpu_dvfs.set_freq_cgroup(freq)
 
     def reset(self) -> None:

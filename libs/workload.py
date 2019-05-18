@@ -24,7 +24,7 @@ class Workload:
         #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
         self._wl_type = wl_type
-        self._is_gpu_task = 0  # if yes, set to 1, otherwise set to 0.
+        self._is_gpu_task = 1  # if yes, set to 1, otherwise set to 0.
 
         self._pid = pid
         self._metrics: Deque[BasicMetric] = deque()
