@@ -43,14 +43,16 @@ class SchedIsolator(Isolator):
     def strengthen(self) -> 'SchedIsolator':
         self.update_max_membw_bg()
         if self._target_bg is not None:
-            self._cur_step[self._max_mem_bg] -= 1
+            self._cur_step[self._target_bg] -= 1
+            #self._cur_step[self._max_mem_bg] -= 1
         # FIXME: hard coded (All workloads are running on the contiguous CPU ID)
         return self
 
     def weaken(self) -> 'SchedIsolator':
         self.update_min_cores_bg()
         if self._target_bg is not None:
-            self._cur_step[self._min_cores_bg] += 1
+            self._cur_step[self._target_bg] += 1
+            #self._cur_step[self._min_cores_bg] += 1
         return self
 
     @property
@@ -93,6 +95,7 @@ class SchedIsolator(Isolator):
         self._stored_config = None
 
     def update_max_membw_bg(self) -> None:
+        logger = logging.getLogger(__name__)
         max_membw = -1
         max_membw_bg = None
         for bg_wl, _ in self._cur_step.items():
@@ -104,10 +107,14 @@ class SchedIsolator(Isolator):
                 max_membw_bg = bg_wl
         self._max_mem_bg = max_membw_bg
         self._target_bg = max_membw_bg
-        print(f'self._max_mem_bg : {self._max_mem_bg}')
-        print(f'self._target_bg : {self._target_bg}')
+        logger.info(f'self._max_mem_bg : {self._max_mem_bg}')
+        logger.info(f'self._target_bg : {self._target_bg}')
+
+        #print(f'self._max_mem_bg : {self._max_mem_bg}')
+        #print(f'self._target_bg : {self._target_bg}')
 
     def update_min_cores_bg(self) -> None:
+        logger = logging.getLogger(__name__)
         min_cores = -1
         min_cores_bg = -1
         for bg, bg_cores in self._cur_step.items():
@@ -116,3 +123,6 @@ class SchedIsolator(Isolator):
                 min_cores_bg = bg
         self._min_cores_bg = min_cores_bg
         self._target_bg = min_cores_bg
+
+        logger.info(f'self._min_cores_bg : {self._min_cores_bg}')
+        logger.info(f'self._target_bg : {self._target_bg}')

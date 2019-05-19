@@ -14,7 +14,7 @@ class CPUFreqThrottleIsolator(Isolator):
         super().__init__(foreground_wl, background_wls)
 
         # FIXME: hard coded
-        # Assumption: FG is latency-sensitive process (CPU) and BG is compute-intensive process (GPU)
+        # Assumption: FG is latency-sensitive process (GPU) and BG is compute-intensive process (CPU)
         self._cur_step: int = CPUDVFS.MAX_IDX
         self._stored_config: Optional[int] = None
         self._cpufreq_range = CPUDVFS.get_freq_range()
