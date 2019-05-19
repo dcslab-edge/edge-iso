@@ -8,6 +8,7 @@ from ...metric_container.basic_metric import MetricDiff
 from ...workload import Workload
 from ...utils.machine_type import MachineChecker, NodeType
 from ...metric_container.basic_metric import BasicMetric
+from .. import NextStep
 
 
 class SchedIsolator(Isolator):
@@ -26,6 +27,7 @@ class SchedIsolator(Isolator):
         # self._bg_wl = self._bgs_list[0]
         # self._num_of_bg_wls = len(self._bgs_list)
         self._cur_step: Dict[Workload, int] = dict()
+        self._cur_action: NextStep = NextStep.IDLE
         for bg_wl in self._bgs_list:
             self._cur_step[bg_wl] = bg_wl.num_cores
         # self._cur_step: Dict[Workload, int] = [(bg_wl, bg_wl.num_cores) for bg_wl in self._bgs_list]
@@ -44,6 +46,7 @@ class SchedIsolator(Isolator):
         self.update_max_membw_bg()
         if self._target_bg is not None:
             self._cur_step[self._target_bg] -= 1
+            self._cur_action = NextStep.STRENGTHEN
             #self._cur_step[self._max_mem_bg] -= 1
         # FIXME: hard coded (All workloads are running on the contiguous CPU ID)
         return self
@@ -52,6 +55,7 @@ class SchedIsolator(Isolator):
         self.update_min_cores_bg()
         if self._target_bg is not None:
             self._cur_step[self._target_bg] += 1
+            self._cur_action = NextStep.WEAKEN
             #self._cur_step[self._min_cores_bg] += 1
         return self
 
@@ -74,8 +78,16 @@ class SchedIsolator(Isolator):
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
-        # FIXME: hard coded
-        self._target_bg.bound_cores = range(self._target_bg.bound_cores[0], self._target_bg.bound_cores[-1]+1)
+        # FIXME: hard coded & Assuming that bg task is placed to CPUs which have higher CPU IDs (e.g., 4,5)
+        #logger.info(f'{self._target_bg.bound_cores[0]}, {self._target_bg.bound_cores[-1]}, {self._target_bg.bound_cores[0]}')
+        if self._cur_action == NextStep.STRENGTHEN:
+            self._target_bg.bound_cores = range(self._target_bg.bound_cores[0]+1,
+                                                self._target_bg.bound_cores[-1])
+        elif self._cur_action == NextStep.WEAKEN:
+            self._target_bg.bound_cores = range(self._target_bg.bound_cores[0]-1,
+                                                self._target_bg.bound_cores[-1])
+        self._cur_action = NextStep.IDLE
+        #self._target_bg.bound_cores = range(self._target_bg.bound_cores)
         for bg_wl, bg_cores in self._cur_step.items():
             logger.info(f'affinity of background [{bg_wl.group_name}] is {bg_wl.bound_cores}')
 
