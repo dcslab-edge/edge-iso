@@ -77,7 +77,9 @@ class SchedIsolator(Isolator):
         return (bg_cores + fg_cores) > self._MAX_CORES or self.is_overlapped_assignment()
 
     def is_overlapped_assignment(self) -> bool:
-        overlapped = self._foreground_wl.bound_cores & self._target_bg.bound_cores
+        fg_cores: Set[int] = self._foreground_wl.cgroup_cpuset.read_cpus()
+        bg_cores: Set[int] = self._target_bg.cgroup_cpuset.read_cpus()
+        overlapped = fg_cores & bg_cores
         if overlapped is not None:
             return True
         else:
