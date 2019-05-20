@@ -74,7 +74,15 @@ class SchedIsolator(Isolator):
         # At most background processes can not preempt cores of the foreground process
         bg_cores = sum(self._cur_step.values())
         fg_cores = self._foreground_wl.num_cores
-        return (bg_cores + fg_cores) > self._MAX_CORES
+        return (bg_cores + fg_cores) > self._MAX_CORES or self.is_overlapped_assignment()
+
+    def is_overlapped_assignment(self) -> bool:
+        overlapped = self._foreground_wl.bound_cores & self._target_bg.bound_cores
+        if overlapped is not None:
+            return True
+        else:
+            return False
+
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
