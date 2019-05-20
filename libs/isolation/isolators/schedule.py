@@ -43,7 +43,9 @@ class SchedIsolator(Isolator):
         return metric_diff.local_mem_util_ps
 
     def strengthen(self) -> 'SchedIsolator':
+        logger = logging.getLogger(__name__)
         self.update_max_membw_bg()
+        logger.info(f'self._target_bg: {self._target_bg}')
         if self._target_bg is not None:
             self._cur_step[self._target_bg] -= 1
             self._cur_action = NextStep.STRENGTHEN
@@ -84,7 +86,6 @@ class SchedIsolator(Isolator):
             return True
         else:
             return False
-
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
