@@ -48,6 +48,8 @@ class EdgePolicy(IsolationPolicy):
             elif resource is ResourceType.MEMORY:
                 #self.foreground_workload.check_gpu_task()
                 if self._node_type == NodeType.IntegratedGPU:
+                    isolator = self._isolator_map[SchedIsolator]
+                    """
                     if self.foreground_workload.is_gpu_task == 1:   # if fg is gpu task, ...
                     # FIXME: choosing an isolator by considering whether the FG task using GPU or not.
                         isolator = self._isolator_map[CPUFreqThrottleIsolator]
@@ -57,6 +59,7 @@ class EdgePolicy(IsolationPolicy):
                         isolator = self._isolator_map[GPUFreqThrottleIsolator]
                         if isolator.is_max_level is True:
                             isolator = self._isolator_map[SchedIsolator]
+                    """
                 elif self._node_type == NodeType.CPU:
                     isolator = self._isolator_map[SchedIsolator]
             else:

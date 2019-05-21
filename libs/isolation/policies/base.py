@@ -33,7 +33,6 @@ class IsolationPolicy(metaclass=ABCMeta):
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
                 (AffinityIsolator, AffinityIsolator(self._fg_wl, self._bg_wls)),
                 (CycleLimitIsolator, CycleLimitIsolator(self._fg_wl, self._bg_wls)),
-                (CPUFreqThrottleIsolator, CPUFreqThrottleIsolator(self._fg_wl, self._bg_wls)),
                 (GPUFreqThrottleIsolator, GPUFreqThrottleIsolator(self._fg_wl, self._bg_wls)),
                 (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wls))
             ))

@@ -24,6 +24,11 @@ class EdgeWViolationPolicy(EdgePolicy):
             return False
 
         resource: ResourceType = self.contentious_resource()
+        return \
+                resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+                or resource is ResourceType.MEMORY and not isinstance(self._cur_isolator, SchedIsolator)
+
+        """
         if self._node_type == NodeType.IntegratedGPU and self.foreground_workload.is_gpu_task == 0:
             return \
                 resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
@@ -34,7 +39,8 @@ class EdgeWViolationPolicy(EdgePolicy):
                 resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
                 or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, CPUFreqThrottleIsolator)
                                                             or isinstance(self._cur_isolator, SchedIsolator))
-        
+        """
+
     @property
     def new_isolator_needed(self) -> bool:
         if isinstance(self._cur_isolator, IdleIsolator):
