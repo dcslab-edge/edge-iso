@@ -252,3 +252,14 @@ class IsolationPolicy(metaclass=ABCMeta):
         if not_empty_metrics == len(self._bg_wls):
             logger.info(f'return True')
             return True
+
+    def check_cores_are_overlapped(self) -> bool:
+        logger = logging.getLogger(__name__)
+        fg_cores: Set[int] = self._fg_wl.cgroup_cpuset.read_cpus()
+        for bg_wl in self._bg_wls:
+            bg_cores: Set[int] = bg_wl.cgroup_cpuset.read_cpus()
+            overlapped = fg_cores & bg_cores
+            if overlapped is not None:
+                return True
+            else:
+                return False

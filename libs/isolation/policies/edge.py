@@ -2,12 +2,12 @@
 
 import logging
 
-from typing import Set
+from typing import Set, Tuple
 
 from .base import IsolationPolicy
 from .. import ResourceType
 from ..isolators import IdleIsolator, CycleLimitIsolator, CPUFreqThrottleIsolator, \
-    GPUFreqThrottleIsolator, SchedIsolator
+    GPUFreqThrottleIsolator, SchedIsolator, AffinityIsolator
 from ...workload import Workload
 from ...utils.machine_type import NodeType
 
@@ -38,9 +38,23 @@ class EdgePolicy(IsolationPolicy):
 
         """
         * When choosing isolator, policy considers whether the foreground task uses GPU. 
-        * If yes, it will use CPUFreqThrottle Isolator
+        * If yes, it will use CPUFreqThrottle Isolator - We don't use it, since it's not per-core dvfs 
         * Otherwise, it will use GPUFreqThrottle Isolator
         """
+
+        # if there are available free cores in the node, ...
+        # FIXME: hard coded `max_cpu_cores`
+        cpu_core_set: Set[int] = {0, 3, 4, 5}
+        alloc_cores_set = set()
+        for bg_wl in self.background_workloads:
+            allocated_cores: Set[int] = set(self._fg_wl.bound_cores + bg_wl.bound_cores)
+            alloc_cores_set |= allocated_cores
+        free_cores_set = cpu_core_set - alloc_cores_set
+        if len(free_cores_set) > 0 and self._fg_wl.number_of_threads > len(self._fg_wl.bound_cores):
+            if AffinityIsolator in self._isolator_map and not self._isolator_map[AffinityIsolator].is_max_level:
+                self._cur_isolator = self._isolator_map[AffinityIsolator]
+                logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
+                return True
 
         for resource, diff_value in self.contentious_resources():
             if resource is ResourceType.CACHE:

@@ -57,7 +57,7 @@ class SchedIsolator(Isolator):
             if start_idx is not end_idx:
                 self._cur_step[self._target_bg] = range(self._target_bg.bound_cores[0]+1, self._target_bg.bound_cores[-1])
             else:
-                self._cur_step[self._target_bg] = [self._target_bg.bound_cores[0]+1,]*2
+                self._cur_step[self._target_bg] = [self._target_bg.bound_cores[0]+1, ]*2
             self._cur_action = NextStep.STRENGTHEN
         return self
 
@@ -66,12 +66,12 @@ class SchedIsolator(Isolator):
         if self._target_bg is not None:
             #self._cur_step[self._target_bg] += 1
             self._cur_step[self._target_bg] = range(self._target_bg.bound_cores[0]-1, self._target_bg.bound_cores[-1])
-            start_core_id = self._target_bg.bound_cores[0]-1
-            end_core_id = self._target_bg.bound_cores[-1]
+            start_idx = self._target_bg.bound_cores[0]-1
+            end_idx = self._target_bg.bound_cores[-1]
             if start_idx is not end_idx:
                 self._cur_step[self._target_bg] = range(self._target_bg.bound_cores[0]-1, self._target_bg.bound_cores[-1])
             else:
-                self._cur_step[self._target_bg] = [self._target_bg.bound_cores[0]-1,]*2
+                self._cur_step[self._target_bg] = [self._target_bg.bound_cores[0]-1, ]*2
             self._cur_action = NextStep.WEAKEN
         return self
 
