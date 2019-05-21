@@ -3,6 +3,7 @@
 from enum import IntEnum
 from ..utils.machine_type import NodeType, ArchType, MachineChecker
 
+
 class NextStep(IntEnum):
     STRENGTHEN = 1
     WEAKEN = 2

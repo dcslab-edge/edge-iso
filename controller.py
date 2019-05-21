@@ -193,7 +193,7 @@ def main() -> None:
     file_handler.setFormatter(formatter)
 
     controller_logger = logging.getLogger(__name__)
-    controller_logger.setLevel(logging.INFO)
+    controller_logger.setLevel(logging.DEBUG)
     controller_logger.addHandler(stream_handler)
     controller_logger.addHandler(file_handler)
 
