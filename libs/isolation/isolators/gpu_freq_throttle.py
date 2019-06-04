@@ -19,8 +19,7 @@ class GPUFreqThrottleIsolator(Isolator):
         self._stored_config: Optional[int] = None
         self._gpufreq_range = GPUDVFS.get_freq_range()
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         return metric_diff.local_mem_util_ps
 
     def strengthen(self) -> 'GPUFreqThrottleIsolator':

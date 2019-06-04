@@ -16,8 +16,7 @@ class AffinityIsolator(Isolator):
 
         self._stored_config: Optional[int] = None
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         return metric_diff.instruction_ps
 
     def strengthen(self) -> 'AffinityIsolator':
@@ -27,7 +26,10 @@ class AffinityIsolator(Isolator):
     @property
     def is_max_level(self) -> bool:
         # FIXME: hard coded
-        return self._cur_step + 1 == self._background_wls[0].bound_cores[0]
+        for bg_wl in self._background_wls:
+            if self._cur_step + 1 == bg_wl.bound_cores[0]:
+                return True
+        return False
 
     @property
     def is_min_level(self) -> bool:

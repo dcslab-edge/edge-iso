@@ -3,6 +3,7 @@
 import logging
 from typing import Optional, Set
 
+from .. import ResourceType
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
 from ...utils.cgroup import Cpu
@@ -10,6 +11,7 @@ from ...workload import Workload
 
 
 class CycleLimitIsolator(Isolator):
+
     def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
         super().__init__(foreground_wl, background_wls)
 
@@ -17,10 +19,14 @@ class CycleLimitIsolator(Isolator):
         self._cur_step: int = Cpu.MAX_PERCENT
         self._stored_config: Optional[int] = None
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
-        return metric_diff.llc_hit_ratio
-        #return metric_diff.local_mem_util_ps
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
+        logger = logging.getLogger(__name__)
+        res_cont_type = super().cur_dominant_resource_cont
+        logger.info(f'[_get_metric_type_from] res_cont_type: {res_cont_type}')
+        if res_cont_type is ResourceType.CACHE:
+            return metric_diff.llc_hit_ratio
+        elif res_cont_type is ResourceType.MEMORY:
+            return metric_diff.local_mem_util_ps
 
     def strengthen(self) -> 'CycleLimitIsolator':
         self._cur_step -= Cpu.STEP

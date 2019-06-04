@@ -40,8 +40,7 @@ class SchedIsolator(Isolator):
 
         self._stored_config: Optional[int] = None
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         return metric_diff.local_mem_util_ps
 
     def strengthen(self) -> 'SchedIsolator':

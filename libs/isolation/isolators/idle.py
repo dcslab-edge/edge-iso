@@ -9,8 +9,7 @@ class IdleIsolator(Isolator):
     def __init__(self) -> None:
         pass
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         pass
 
     def strengthen(self) -> 'Isolator':

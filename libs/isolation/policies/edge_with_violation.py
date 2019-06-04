@@ -20,13 +20,16 @@ class EdgeWViolationPolicy(EdgePolicy):
         self._violation_count: int = 0
 
     def _check_violation(self) -> bool:
+        logger = logging.getLogger(__name__)
         if isinstance(self._cur_isolator, AffinityIsolator):
             return False
 
         resource: ResourceType = self.contentious_resource()
+        logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
         return \
                 resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
-                or resource is ResourceType.MEMORY and not isinstance(self._cur_isolator, SchedIsolator)
+                or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
+                                                            or isinstance(self._cur_isolator, CycleLimitIsolator))
 
         """
         if self._node_type == NodeType.IntegratedGPU and self.foreground_workload.is_gpu_task == 0:

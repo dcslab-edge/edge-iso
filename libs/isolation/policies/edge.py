@@ -50,11 +50,15 @@ class EdgePolicy(IsolationPolicy):
             allocated_cores: Set[int] = set(self._fg_wl.bound_cores + bg_wl.bound_cores)
             alloc_cores_set |= allocated_cores
         free_cores_set = cpu_core_set - alloc_cores_set
-        if len(free_cores_set) > 0 and self._fg_wl.number_of_threads > len(self._fg_wl.bound_cores):
-            if AffinityIsolator in self._isolator_map and not self._isolator_map[AffinityIsolator].is_max_level:
-                self._cur_isolator = self._isolator_map[AffinityIsolator]
-                logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
-                return True
+        logger.info(f'[choose_next_isolator] free_cores_set: {free_cores_set}')
+        #if len(free_cores_set) > 0 and self._fg_wl.number_of_threads > len(self._fg_wl.bound_cores):
+        # TODO: Affinity Isolator should work properly when WEAKEN and STRENGTHEN.
+        if len(free_cores_set) > 0 or self._fg_wl.number_of_threads < len(self._fg_wl.bound_cores):
+            if AffinityIsolator in self._isolator_map:
+                if not self._isolator_map[AffinityIsolator].is_max_level and not self._isolator_map[AffinityIsolator].is_min_level:
+                    self._cur_isolator = self._isolator_map[AffinityIsolator]
+                    logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
+                    return True
 
         for resource, diff_value in self.contentious_resources():
             if resource is ResourceType.CACHE:
@@ -63,6 +67,8 @@ class EdgePolicy(IsolationPolicy):
                 #self.foreground_workload.check_gpu_task()
                 if self._node_type == NodeType.IntegratedGPU:
                     isolator = self._isolator_map[SchedIsolator]
+                    if isolator.is_max_level is True:
+                        isolator = self._isolator_map[CycleLimitIsolator]
                     """
                     if self.foreground_workload.is_gpu_task == 1:   # if fg is gpu task, ...
                     # FIXME: choosing an isolator by considering whether the FG task using GPU or not.
@@ -79,10 +85,14 @@ class EdgePolicy(IsolationPolicy):
             else:
                 raise NotImplementedError(f'Unknown ResourceType: {resource}')
 
+            logger.info(f'[contentious_resources_loop] resource: {resource}, diff_value: {diff_value}, isolator: {isolator}')
             if diff_value < 0 and not isolator.is_max_level or \
                     diff_value > 0 and not isolator.is_min_level:
                 self._cur_isolator = isolator
+                self._cur_isolator.cur_dominant_resource_cont = resource
+
                 logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
+                logger.info(f'Dominant Resource Contention: {self._cur_isolator.cur_dominant_resource_cont}')
                 return True
 
         logger.debug('A new Isolator has not been selected')

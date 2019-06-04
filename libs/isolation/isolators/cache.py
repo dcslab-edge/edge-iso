@@ -18,8 +18,7 @@ class CacheIsolator(Isolator):
 
         self._stored_config: Optional[Tuple[int, int]] = None
 
-    @classmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         return metric_diff.l3_hit_ratio
 
     def strengthen(self) -> 'CacheIsolator':

@@ -37,6 +37,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 (SchedIsolator, SchedIsolator(self._fg_wl, self._bg_wls))
             ))
         self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR
+
         self._in_solorun_profile: bool = False
         self._cached_fg_num_threads: int = fg_wl.number_of_threads
         self._solorun_verify_violation_count: int = 0

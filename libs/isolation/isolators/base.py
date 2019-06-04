@@ -5,6 +5,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, ClassVar, Optional, Set
 
 from .. import NextStep
+from .. import ResourceType
 from ...metric_container.basic_metric import MetricDiff
 from ...workload import Workload
 
@@ -24,6 +25,7 @@ class Isolator(metaclass=ABCMeta):
         self._bg_next_steps = NextStep.IDLE
 
         self._is_first_decision: bool = True
+        self._cur_dominant_resource_cont: ResourceType = None
 
         self._stored_config: Optional[Any] = None
 
@@ -66,6 +68,14 @@ class Isolator(metaclass=ABCMeta):
     def enforce(self) -> None:
         """Actually applies the isolation parameter that set on the current object"""
         pass
+
+    @property
+    def cur_dominant_resource_cont(self) -> ResourceType:
+        return self._cur_dominant_resource_cont
+
+    @cur_dominant_resource_cont.setter
+    def cur_dominant_resource_cont(self, resource: ResourceType) -> None:
+        self._cur_dominant_resource_cont = resource
 
     def yield_isolation(self) -> None:
         """
@@ -118,9 +128,8 @@ class Isolator(metaclass=ABCMeta):
             else:
                 return NextStep.STRENGTHEN
 
-    @classmethod
     @abstractmethod
-    def _get_metric_type_from(cls, metric_diff: MetricDiff) -> float:
+    def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         pass
 
     def decide_next_step(self) -> NextStep:
