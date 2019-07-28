@@ -1,11 +1,12 @@
 # coding: UTF-8
 
 from statistics import mean
-from typing import Iterable
+from typing import Iterable, Optional
 from itertools import islice
 
 from cpuinfo import cpuinfo
 from ..utils.machine_type import MachineChecker, NodeType
+from ..isolation import ResourceType
 
 NODE_TYPE = MachineChecker.get_node_type()
 
@@ -133,6 +134,25 @@ class MetricDiff:
     @property
     def instruction_ps(self) -> float:
         return self._instruction_ps
+
+    def calc_by_diff_slack(self, diff_slack: float) -> Iterable:
+        # NOTE: diff_slack is positive float value
+        avail_slacks = dict()
+        diff_dict = dict()
+
+        #diff_dict[ResourceType.CPU] = self._instruction_ps
+        diff_dict[ResourceType.CACHE] = self._llc_hit_ratio
+        diff_dict[ResourceType.MEMORY] = self._llc_miss_ps
+
+        for res, val in diff_dict.items():
+            if val < 0:
+                # Under contention
+                avail_slack = val + diff_slack
+            else:
+                # Excess resource slack
+                avail_slack = val - diff_slack
+            avail_slacks[res] = avail_slack
+        return avail_slacks
 
     def verify(self) -> bool:
         return self._llc_miss_ps <= 1 and self._instruction_ps <= 1

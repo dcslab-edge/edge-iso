@@ -60,6 +60,7 @@ class EdgePolicy(IsolationPolicy):
                     logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
                     return True
 
+        # TODO: Resource Fungibility?
         for resource, diff_value in self.contentious_resources():
             if resource is ResourceType.CACHE:
                     isolator = self._isolator_map[CycleLimitIsolator]

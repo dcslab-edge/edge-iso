@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import ClassVar, Dict, Tuple, Type, Set
+from typing import ClassVar, Dict, Tuple, Type, Set, Iterable, Optional
 
 from .. import ResourceType
 from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, \
@@ -65,7 +65,7 @@ class IsolationPolicy(metaclass=ABCMeta):
     def contentious_resource(self) -> ResourceType:
         return self.contentious_resources()[0][0]
 
-    def contentious_resources(self) -> Tuple[Tuple[ResourceType, float], ...]:
+    def contentious_resources(self, diff_slack: float = 0.0) -> Tuple[Tuple[ResourceType, float], ...]:
         metric_diff: MetricDiff = self._fg_wl.calc_metric_diff()
 
         logger = logging.getLogger(__name__)
@@ -81,6 +81,11 @@ class IsolationPolicy(metaclass=ABCMeta):
         Sorting resource contention (diff) descending order (when all value is positive, which means FG is fast)
         Sorting resource contention (diff) ascending order (if any non-positive value exist)
         """
+        if diff_slack > 0.0:
+            avail_slacks = metric_diff.calc_by_diff_slack(diff_slack)
+
+        # TODO: switching `resources` with avail_slacks when `diff_slack` exists.
+
         if all(v > 0 for m, v in resources):
             return tuple(sorted(resources, key=lambda x: x[1], reverse=True))
 
