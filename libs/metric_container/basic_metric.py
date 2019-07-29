@@ -1,7 +1,7 @@
 # coding: UTF-8
 
 from statistics import mean
-from typing import Iterable, Optional
+from typing import Iterable, Tuple
 from itertools import islice
 
 from cpuinfo import cpuinfo
@@ -135,19 +135,22 @@ class MetricDiff:
     def instruction_ps(self) -> float:
         return self._instruction_ps
 
-    def calc_by_diff_slack(self, diff_slack: float) -> dict:
+    def calc_by_diff_slack(self, diff_slack: float) -> Tuple[Tuple[ResourceType, float], ...]:
         # NOTE: diff_slack is positive float value
-        resource_slacks = dict()
-        diff_dict = dict()
+        resource_slacks = ()
+        #diff_dict = ()
 
-        diff_dict[ResourceType.CPU] = self._instruction_ps
-        diff_dict[ResourceType.CACHE] = self._llc_hit_ratio
-        diff_dict[ResourceType.MEMORY] = self._llc_miss_ps
+        #diff_dict[ResourceType.CPU] = self._instruction_ps
+        #diff_dict[ResourceType.CACHE] = self._llc_hit_ratio
+        #diff_dict[ResourceType.MEMORY] = self._llc_miss_ps
+        orig_diff = ((ResourceType.CPU, self._instruction_ps),
+                     (ResourceType.CACHE, self._llc_hit_ratio),
+                     (ResourceType.MEMORY, self._llc_miss_ps))
 
         # Calculating slack from pre-defined diff value
         # `resource_slacks` contains all diffs re-calculated using `diff_slack`
-        for res, val in diff_dict.items():
-            resource_slacks[res] = val - diff_slack
+        for res, val in orig_diff:
+            resource_slacks += (res, val - diff_slack)
 
         return resource_slacks
 
