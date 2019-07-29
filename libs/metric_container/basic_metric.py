@@ -138,11 +138,7 @@ class MetricDiff:
     def calc_by_diff_slack(self, diff_slack: float) -> Tuple[Tuple[ResourceType, float], ...]:
         # NOTE: diff_slack is positive float value
         resource_slacks = ()
-        #diff_dict = ()
 
-        #diff_dict[ResourceType.CPU] = self._instruction_ps
-        #diff_dict[ResourceType.CACHE] = self._llc_hit_ratio
-        #diff_dict[ResourceType.MEMORY] = self._llc_miss_ps
         orig_diff = ((ResourceType.CPU, self._instruction_ps),
                      (ResourceType.CACHE, self._llc_hit_ratio),
                      (ResourceType.MEMORY, self._llc_miss_ps))
@@ -150,7 +146,7 @@ class MetricDiff:
         # Calculating slack from pre-defined diff value
         # `resource_slacks` contains all diffs re-calculated using `diff_slack`
         for res, val in orig_diff:
-            resource_slacks += (res, val - diff_slack)
+            resource_slacks += ((res, val - diff_slack),)
 
         return resource_slacks
 
