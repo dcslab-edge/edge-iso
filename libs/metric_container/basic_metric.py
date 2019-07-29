@@ -137,22 +137,19 @@ class MetricDiff:
 
     def calc_by_diff_slack(self, diff_slack: float) -> Iterable:
         # NOTE: diff_slack is positive float value
-        avail_slacks = dict()
+        resource_slacks = dict()
         diff_dict = dict()
 
-        #diff_dict[ResourceType.CPU] = self._instruction_ps
+        diff_dict[ResourceType.CPU] = self._instruction_ps
         diff_dict[ResourceType.CACHE] = self._llc_hit_ratio
         diff_dict[ResourceType.MEMORY] = self._llc_miss_ps
 
+        # Calculating slack from pre-defined diff value
+        # `resource_slacks` contains all diffs re-calculated using `diff_slack`
         for res, val in diff_dict.items():
-            if val < 0:
-                # Under contention
-                avail_slack = val + diff_slack
-            else:
-                # Excess resource slack
-                avail_slack = val - diff_slack
-            avail_slacks[res] = avail_slack
-        return avail_slacks
+            resource_slacks[res] = val - diff_slack
+
+        return resource_slacks
 
     def verify(self) -> bool:
         return self._llc_miss_ps <= 1 and self._instruction_ps <= 1

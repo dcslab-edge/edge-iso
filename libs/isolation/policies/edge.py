@@ -57,13 +57,15 @@ class EdgePolicy(IsolationPolicy):
             if AffinityIsolator in self._isolator_map:
                 if not self._isolator_map[AffinityIsolator].is_max_level and not self._isolator_map[AffinityIsolator].is_min_level:
                     self._cur_isolator = self._isolator_map[AffinityIsolator]
+                    self._cur_isolator.cur_dominant_resource_cont = ResourceType.CPU
                     logger.info(f'Starting {self._cur_isolator.__class__.__name__}...')
+                    logger.info(f'Dominant Resource Contention: {self._cur_isolator.cur_dominant_resource_cont}')
                     return True
 
-        # TODO: Resource Fungibility?
+        # TODO: Resource Fungibility(?), diff_slack for argument of contentious_resources
         for resource, diff_value in self.contentious_resources():
             if resource is ResourceType.CACHE:
-                    isolator = self._isolator_map[CycleLimitIsolator]
+                isolator = self._isolator_map[CycleLimitIsolator]
             elif resource is ResourceType.MEMORY:
                 #self.foreground_workload.check_gpu_task()
                 if self._node_type == NodeType.IntegratedGPU:
@@ -83,6 +85,8 @@ class EdgePolicy(IsolationPolicy):
                     """
                 elif self._node_type == NodeType.CPU:
                     isolator = self._isolator_map[SchedIsolator]
+            elif resource is ResourceType.CPU:
+                continue
             else:
                 raise NotImplementedError(f'Unknown ResourceType: {resource}')
 

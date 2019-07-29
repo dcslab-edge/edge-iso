@@ -65,7 +65,7 @@ class IsolationPolicy(metaclass=ABCMeta):
     def contentious_resource(self) -> ResourceType:
         return self.contentious_resources()[0][0]
 
-    def contentious_resources(self, diff_slack: float = 0.0) -> Tuple[Tuple[ResourceType, float], ...]:
+    def contentious_resources(self, diff_slack: Optional[float] = None) -> Tuple[Tuple[ResourceType, float], ...]:
         metric_diff: MetricDiff = self._fg_wl.calc_metric_diff()
 
         logger = logging.getLogger(__name__)
@@ -74,23 +74,23 @@ class IsolationPolicy(metaclass=ABCMeta):
         for idx, bg_wl in enumerate(self._bg_wls):
             logger.info(f'background[{idx}] : {bg_wl.calc_metric_diff()}')
 
-        resources = ((ResourceType.CACHE, metric_diff.llc_hit_ratio),
-                     (ResourceType.MEMORY, metric_diff.local_mem_util_ps))
+        #resources = ((ResourceType.CACHE, metric_diff.llc_hit_ratio),
+        #             (ResourceType.MEMORY, metric_diff.local_mem_util_ps))
 
         """
         Sorting resource contention (diff) descending order (when all value is positive, which means FG is fast)
         Sorting resource contention (diff) ascending order (if any non-positive value exist)
         """
-        if diff_slack > 0.0:
-            avail_slacks = metric_diff.calc_by_diff_slack(diff_slack)
+        if diff_slack is None:
+            resource_slacks = metric_diff.calc_by_diff_slack(0.0)
+        elif diff_slack is not None:
+            resource_slacks = metric_diff.calc_by_diff_slack(diff_slack)
 
-        # TODO: switching `resources` with avail_slacks when `diff_slack` exists.
-
-        if all(v > 0 for m, v in resources):
-            return tuple(sorted(resources, key=lambda x: x[1], reverse=True))
+        if all(v > 0 for m, v in resource_slacks):
+            return tuple(sorted(resource_slacks, key=lambda x: x[1], reverse=True))
 
         else:
-            return tuple(sorted(resources, key=lambda x: x[1]))
+            return tuple(sorted(resource_slacks, key=lambda x: x[1]))
 
     @property
     def foreground_workload(self) -> Workload:
