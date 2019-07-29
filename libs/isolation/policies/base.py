@@ -86,7 +86,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         elif diff_slack is not None:
             resource_slacks = metric_diff.calc_by_diff_slack(diff_slack)
 
-        if all(v > 0 for m, v in resource_slacks):
+        if all(v > 0 for m, v in resource_slacks.items()):
             return tuple(sorted(resource_slacks, key=lambda x: x[1], reverse=True))
 
         else:

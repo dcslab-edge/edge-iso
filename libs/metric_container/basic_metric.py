@@ -135,7 +135,7 @@ class MetricDiff:
     def instruction_ps(self) -> float:
         return self._instruction_ps
 
-    def calc_by_diff_slack(self, diff_slack: float) -> Iterable:
+    def calc_by_diff_slack(self, diff_slack: float) -> dict:
         # NOTE: diff_slack is positive float value
         resource_slacks = dict()
         diff_dict = dict()
