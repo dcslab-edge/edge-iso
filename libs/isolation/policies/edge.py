@@ -63,7 +63,9 @@ class EdgePolicy(IsolationPolicy):
                     return True
 
         # TODO: Resource Fungibility(?), diff_slack for argument of contentious_resources
-        for resource, diff_value in self.contentious_resources():
+        # FIXME: Currently, diff_slack is FIXED to 0.2 for testing!
+        diff_slack = 0.2
+        for resource, diff_value in self.contentious_resources(diff_slack):
             if resource is ResourceType.CACHE:
                 isolator = self._isolator_map[CycleLimitIsolator]
             elif resource is ResourceType.MEMORY:
