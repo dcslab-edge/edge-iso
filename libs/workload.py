@@ -23,7 +23,7 @@ class Workload:
     def __init__(self, name: str, wl_type: str, pid: int, perf_pid: int, perf_interval: int) -> None:
         #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
-        self._wl_type = wl_type
+        self._wl_type = wl_type # BE or LC
         self._is_gpu_task = 1  # if yes, set to 1, otherwise set to 0.
 
         self._pid = pid
@@ -43,11 +43,13 @@ class Workload:
         # This variable is used to contain the recent avg. status
         self._avg_solorun_data: Optional[BasicMetric] = None
 
-        if wl_type == 'bg':
+        if wl_type == 'BE':
             self._avg_solorun_data = data_map[name]
 
         self._orig_bound_cores: Tuple[int, ...] = tuple(self._cgroup_cpuset.read_cpus())
         self._orig_bound_mems: Set[int] = self._cgroup_cpuset.read_mems()
+        self._excess_cpu_flag = False   # flag indicating unused cpu cores exist
+        self._diff_slack = None         # slack for expressing diverse SLOs (by controlling resource contention diff)
 
     def __repr__(self) -> str:
         return f'{self._name} (pid: {self._pid})'
@@ -149,6 +151,22 @@ class Workload:
             return self._proc_info.num_threads()
         except psutil.NoSuchProcess:
             return 0
+
+    @property
+    def excess_cpu_flag(self) -> bool:
+        return self._excess_cpu_flag
+
+    @excess_cpu_flag.setter
+    def excess_cpu_flag(self, flag: bool):
+        self._excess_cpu_flag = flag
+
+    @property
+    def diff_slack(self) -> float:
+        return self._diff_slack
+
+    @diff_slack.setter
+    def diff_slack(self, new_diff_slack:float):
+        self._diff_slack = new_diff_slack
 
     @property
     def avg_solorun_data(self) -> Optional[BasicMetric]:

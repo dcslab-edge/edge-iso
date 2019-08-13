@@ -1,7 +1,7 @@
 # coding: UTF-8
 
 from statistics import mean
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, Optional
 from itertools import islice
 
 from cpuinfo import cpuinfo

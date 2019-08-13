@@ -63,10 +63,10 @@ class PollingThread(Thread, metaclass=Singleton):
 
         workload = Workload(wl_name, wl_type, pid, perf_pid, perf_interval)
         #workload.check_gpu_task()
-        if wl_type == 'bg':
-            logger.info(f'{workload} is background process')
+        if wl_type == 'BE':
+            logger.info(f'{workload} is best-effort process')
         else:
-            logger.info(f'{workload} is foreground process')
+            logger.info(f'{workload} is latency-critical process')
 
         self._pending_wl.add(workload, max_wls)
 

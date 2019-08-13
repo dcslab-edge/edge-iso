@@ -153,7 +153,7 @@ class Controller:
             group.reset()
             del self._isolation_groups[group]
             if group.in_solorun_profiling:
-                for bg_wl in group.background_workloads:
+                for bg_wl in group.best_effort_workloads:
                     bg_wl.resume()
                 del self._solorun_count[group]
 

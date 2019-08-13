@@ -13,15 +13,15 @@ class PendingQueue(Sized):
         self._policy_type: Type[IsolationPolicy] = policy_type
 
         # self._bg_q: Dict[Tuple[int, ...], Workload] = dict()
-        self._bg_q_list: List[Dict[Tuple[int, ...], Workload]] = list(dict())
-        self._fg_q: Dict[Tuple[int, ...], Workload] = dict()
+        self._be_q_list: List[Dict[Tuple[int, ...], Workload]] = list(dict())
+        self._lc_q_list: List[Dict[Tuple[int, ...], Workload]] = list(dict())
         self._ready_queues: DefaultDict[int, List[Workload]] = defaultdict(list)    # ready_queue per socket
         self._pending_list: List[IsolationPolicy] = list()                          # pending workload pairs
         self._first_pending: bool = True
 
     def __len__(self) -> int:
         pending_queue_len = len(tuple(
-            filter(lambda x: len(x.foreground_workload.metrics) > 0 and x.check_bg_wls_metrics(), self._pending_list)))
+            filter(lambda x: x.check_lc_wls_metrics() and x.check_be_wls_metrics(), self._pending_list)))
         #print(f'pending_queue_len: {pending_queue_len}, self._pending_list: {self._pending_list}')
         return pending_queue_len
         #return len(tuple(
@@ -40,14 +40,14 @@ class PendingQueue(Sized):
         # Here, max_workloads is the `bench` numbers specified in bench_launcher's experiments config.json
         print(f'ready_queue: {ready_queue}, len_ready_queue: {len(ready_queue)}, max_workloads: {max_workloads}')
         if len(ready_queue) == max_workloads and self._first_pending:
-            fg_wl = None
-            bg_wls = set()
+            lc_wls = set()
+            be_wls = set()
             for workload in ready_queue:
-                if workload.wl_type == 'fg':
-                    fg_wl = workload
+                if workload.wl_type == 'LC':
+                    lc_wls.add(workload)
                 else:
-                    bg_wls.add(workload)
-            new_group = self._policy_type(fg_wl, bg_wls)
+                    be_wls.add(workload)
+            new_group = self._policy_type(lc_wls, be_wls)
             self._pending_list.append(new_group)
             self._ready_queues[0] = list()
             self._first_pending = False
