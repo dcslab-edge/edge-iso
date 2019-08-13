@@ -38,7 +38,7 @@ class SwapIsolator:
         logger = logging.getLogger(__name__)
 
         contentions: Tuple[Tuple[IsolationPolicy, MetricDiff], ...] = tuple(
-                (group, group.foreground_workload.calc_metric_diff())
+                (group, group.latency_critical_workloads.calc_metric_diff())
                 for group in self._all_groups.keys()
         )
 
