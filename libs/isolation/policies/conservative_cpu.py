@@ -34,19 +34,19 @@ class ConservativeCPUPolicy(IsolationPolicy):
         if resource is ResourceType.CPU:
             self._cur_isolator = self._isolator_map[CoreIsolator]
             self._cur_isolator._contentious_resource = ResourceType.CPU
-            logger.info(f'Core Isolation for {self._fg_wl} is started to isolate {ResourceType.CPU.name}s')
+            logger.info(f'Core Isolation for {self._lc_wls} is started to isolate {ResourceType.CPU.name}s')
             return True
 
         elif not self._is_llc_isolated and resource is ResourceType.CACHE:
             self._cur_isolator = self._isolator_map[CacheIsolator]
             self._is_llc_isolated = True
-            logger.info(f'Cache Isolation for {self._fg_wl} is started to isolate {ResourceType.CACHE.name}s')
+            logger.info(f'Cache Isolation for {self._lc_wls} is started to isolate {ResourceType.CACHE.name}s')
             return True
 
         elif not self._is_mem_isolated and resource is ResourceType.MEMORY:
             self._cur_isolator = self._isolator_map[MemoryIsolator]
             self._is_mem_isolated = True
-            logger.info(f'Memory Bandwidth Isolation for {self._fg_wl} is started '
+            logger.info(f'Memory Bandwidth Isolation for {self._lc_wls} is started '
                         f'to isolate {ResourceType.MEMORY.name} BW')
             return True
 
@@ -54,7 +54,7 @@ class ConservativeCPUPolicy(IsolationPolicy):
             self._cur_isolator = self._isolator_map[CoreIsolator]
             self._is_core_isolated = True
             self._cur_isolator._contentious_resource = ResourceType.MEMORY
-            logger.info(f'Core Isolation for {self._fg_wl} is started to isolate {ResourceType.MEMORY.name} BW ')
+            logger.info(f'Core Isolation for {self._lc_wls} is started to isolate {ResourceType.MEMORY.name} BW ')
             return True
 
         else:

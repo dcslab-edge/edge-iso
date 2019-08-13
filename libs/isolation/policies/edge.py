@@ -13,8 +13,8 @@ from ...utils.machine_type import NodeType
 
 
 class EdgePolicy(IsolationPolicy):
-    def __init__(self, fg_wl: Workload, bg_wls: Set[Workload]) -> None:
-        super().__init__(fg_wl, bg_wls)
+    def __init__(self, lc_wls: Set[Workload], bg_wls: Set[Workload]) -> None:
+        super().__init__(lc_wls, bg_wls)
         self._is_mem_isolated = False
         self._is_freq_throttled_max = False
 
@@ -45,15 +45,18 @@ class EdgePolicy(IsolationPolicy):
         # if there are available free cores in the node, ...
         # FIXME: hard coded `max_cpu_cores`
         cpu_core_set: Set[int] = {0, 3, 4, 5}
-        alloc_cores_set = set()
-        for bg_wl in self.background_workloads:
-            allocated_cores: Set[int] = set(self._fg_wl.bound_cores + bg_wl.bound_cores)
-            alloc_cores_set |= allocated_cores
-        free_cores_set = cpu_core_set - alloc_cores_set
+
+        self.update_allocated_cores()
+        all_allocated_cores: Set[int] = self.all_lc_cores | self.all_be_cores
+
+        free_cores_set = cpu_core_set - all_allocated_cores
         logger.info(f'[choose_next_isolator] free_cores_set: {free_cores_set}')
-        #if len(free_cores_set) > 0 and self._fg_wl.number_of_threads > len(self._fg_wl.bound_cores):
+
         # TODO: Affinity Isolator should work properly when WEAKEN and STRENGTHEN.
-        if len(free_cores_set) > 0 or self._fg_wl.number_of_threads < len(self._fg_wl.bound_cores):
+        # WEAKEN: When free CPUs exist
+        # STRENGTHEN: When workloads having excess CPUs exist
+        # `check_excess_cpus` returns
+        if len(free_cores_set) > 0 or self.check_excess_cpus_wls():
             if AffinityIsolator in self._isolator_map:
                 if not self._isolator_map[AffinityIsolator].is_max_level and not self._isolator_map[AffinityIsolator].is_min_level:
                     self._cur_isolator = self._isolator_map[AffinityIsolator]
@@ -64,8 +67,12 @@ class EdgePolicy(IsolationPolicy):
 
         # TODO: Resource Fungibility(?), diff_slack for argument of contentious_resources
         # FIXME: Currently, diff_slack is FIXED to 0.2 for testing!
-        diff_slack = 0.2
-        for resource, diff_value in self.contentious_resources(diff_slack):
+        # TODO: self.contentious_resources is not workload's function!
+        #lc_wl = self.most_contentious_workload()
+        target_wl = self.choose_workload_to_be_allocated()
+        target_wl.diff_slack = 0.2
+        self._cur_isolator.target_wl = target_wl
+        for resource, diff_value in self.contentious_resources(target_wl):
             if resource is ResourceType.CACHE:
                 isolator = self._isolator_map[CycleLimitIsolator]
             elif resource is ResourceType.MEMORY:
