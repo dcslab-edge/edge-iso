@@ -10,8 +10,8 @@ from ...workload import Workload
 
 
 class CacheIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wl: Workload) -> None:
-        super().__init__(foreground_wl, background_wl)
+    def __init__(self, latency_critical_wls: Workload, background_wl: Workload) -> None:
+        super().__init__(latency_critical_wls, background_wl)
 
         self._prev_step: Optional[int] = None
         self._cur_step: Optional[int] = None
@@ -64,8 +64,8 @@ class CacheIsolator(Isolator):
 
             # FIXME: hard coded -> The number of socket is two at most
             masks = [ResCtrl.MIN_MASK, ResCtrl.MIN_MASK]
-            masks[self._foreground_wl.cur_socket_id()] = ResCtrl.gen_mask(0, self._cur_step)
-            self._foreground_wl.resctrl.assign_llc(*masks)
+            masks[self._latency_critical_wls.cur_socket_id()] = ResCtrl.gen_mask(0, self._cur_step)
+            self._latency_critical_wls.resctrl.assign_llc(*masks)
 
             # FIXME: hard coded -> The number of socket is two at most
             masks = [ResCtrl.MIN_MASK, ResCtrl.MIN_MASK]
@@ -80,9 +80,9 @@ class CacheIsolator(Isolator):
             bg_masks[self._background_wl.cur_socket_id()] = ResCtrl.MAX_MASK
             self._background_wl.resctrl.assign_llc(*bg_masks)
 
-        if self._foreground_wl.is_running:
-            masks[self._foreground_wl.cur_socket_id()] = ResCtrl.MAX_MASK
-            self._foreground_wl.resctrl.assign_llc(*masks)
+        if self._latency_critical_wls.is_running:
+            masks[self._latency_critical_wls.cur_socket_id()] = ResCtrl.MAX_MASK
+            self._latency_critical_wls.resctrl.assign_llc(*masks)
 
     def store_cur_config(self) -> None:
         self._stored_config = (self._prev_step, self._cur_step)

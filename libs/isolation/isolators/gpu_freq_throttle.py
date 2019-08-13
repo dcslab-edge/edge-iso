@@ -10,8 +10,8 @@ from ...workload import Workload
 
 
 class GPUFreqThrottleIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
-        super().__init__(foreground_wl, background_wls)
+    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+        super().__init__(latency_critical_wls, best_effort_wls)
 
         # FIXME: hard coded
         # Assumption: FG is latency-sensitive process (CPU) and BG is compute-intensive process (GPU)
@@ -43,7 +43,7 @@ class GPUFreqThrottleIsolator(Isolator):
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
         freq = self._gpufreq_range[self._cur_step]
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             logger.info(f'frequency of GPU cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000_000}GHz')
         GPUDVFS.set_freq(freq)
 

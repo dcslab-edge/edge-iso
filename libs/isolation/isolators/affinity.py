@@ -9,10 +9,10 @@ from ...workload import Workload
 
 
 class AffinityIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
-        super().__init__(foreground_wl, background_wls)
+    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+        super().__init__(latency_critical_wls, best_effort_wls)
 
-        self._cur_step: int = self._foreground_wl.orig_bound_cores[-1]
+        self._cur_step: int = self._latency_critical_wls.orig_bound_cores[-1]
 
         self._stored_config: Optional[int] = None
 
@@ -26,14 +26,14 @@ class AffinityIsolator(Isolator):
     @property
     def is_max_level(self) -> bool:
         # FIXME: hard coded
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             if self._cur_step + 1 == bg_wl.bound_cores[0]:
                 return True
         return False
 
     @property
     def is_min_level(self) -> bool:
-        return self._foreground_wl.orig_bound_cores == self._foreground_wl.bound_cores
+        return self._latency_critical_wls.orig_bound_cores == self._latency_critical_wls.bound_cores
 
     def weaken(self) -> 'AffinityIsolator':
         self._cur_step -= 1
@@ -41,13 +41,13 @@ class AffinityIsolator(Isolator):
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
-        logger.info(f'affinity of foreground is {self._foreground_wl.orig_bound_cores[0]}-{self._cur_step}')
+        logger.info(f'affinity of foreground is {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_step}')
 
-        self._foreground_wl.bound_cores = range(self._foreground_wl.orig_bound_cores[0], self._cur_step + 1)
+        self._latency_critical_wls.bound_cores = range(self._latency_critical_wls.orig_bound_cores[0], self._cur_step + 1)
 
     def reset(self) -> None:
-        if self._foreground_wl.is_running:
-            self._foreground_wl.bound_cores = self._foreground_wl.orig_bound_cores
+        if self._latency_critical_wls.is_running:
+            self._latency_critical_wls.bound_cores = self._latency_critical_wls.orig_bound_cores
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_step

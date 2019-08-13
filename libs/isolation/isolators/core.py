@@ -12,11 +12,11 @@ from ...workload import Workload
 class CoreIsolator(Isolator):
     _INST_PS_THRESHOLD: ClassVar[float] = -0.5
 
-    def __init__(self, foreground_wl: Workload, background_wl: Workload) -> None:
-        super().__init__(foreground_wl, background_wl)
+    def __init__(self, latency_critical_wls: Workload, background_wl: Workload) -> None:
+        super().__init__(latency_critical_wls, background_wl)
 
         # FIXME: hard coded (contiguous allocation)
-        self._cur_fg_step: int = foreground_wl.orig_bound_cores[-1]
+        self._cur_fg_step: int = latency_critical_wls.orig_bound_cores[-1]
         self._cur_bg_step: int = background_wl.orig_bound_cores[0]
 
         self._bg_next_step: NextStep = NextStep.IDLE
@@ -65,15 +65,15 @@ class CoreIsolator(Isolator):
     @property
     def is_min_level(self) -> bool:
         return self._cur_bg_step == self._background_wl.orig_bound_cores[0] and \
-               self._cur_fg_step == self._foreground_wl.orig_bound_cores[-1]
+               self._cur_fg_step == self._latency_critical_wls.orig_bound_cores[-1]
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
-        logger.debug(f'fg affinity : {self._foreground_wl.orig_bound_cores[0]}-{self._cur_fg_step}')
+        logger.debug(f'fg affinity : {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_fg_step}')
         logger.debug(f'bg affinity : {self._cur_bg_step}-{self._background_wl.orig_bound_cores[-1]}')
 
         # FIXME: hard coded (contiguous allocation)
-        self._foreground_wl.bound_cores = range(self._foreground_wl.orig_bound_cores[0], self._cur_fg_step + 1)
+        self._latency_critical_wls.bound_cores = range(self._latency_critical_wls.orig_bound_cores[0], self._cur_fg_step + 1)
         self._background_wl.bound_cores = range(self._cur_bg_step, self._background_wl.orig_bound_cores[-1] + 1)
 
     def _first_decision(self, metric_diff: MetricDiff) -> NextStep:
@@ -144,7 +144,7 @@ class CoreIsolator(Isolator):
         # BG Next Step Decision
         # ResourceType.CPU - If FG workload not fully use all its assigned cores..., then BG can weaken!
         if self._contentious_resource == ResourceType.CPU:
-            fg_not_used_cores = len(self._foreground_wl.bound_cores) - self._foreground_wl.number_of_threads
+            fg_not_used_cores = len(self._latency_critical_wls.bound_cores) - self._latency_critical_wls.number_of_threads
 
             if fg_not_used_cores == 0:
                 self._bg_next_step = NextStep.IDLE
@@ -160,7 +160,7 @@ class CoreIsolator(Isolator):
         # FIXME: Specifying fg's strengthen/weaken condition (related to fg's performance)
         # FIXME: hard coded (contiguous allocation)
         # FG Next Step Decision
-        if fg_instruction_ps > self._INST_PS_THRESHOLD and self._foreground_wl.orig_bound_cores[-1] < self._cur_fg_step:
+        if fg_instruction_ps > self._INST_PS_THRESHOLD and self._latency_critical_wls.orig_bound_cores[-1] < self._cur_fg_step:
             self._fg_next_step = NextStep.STRENGTHEN
         else:
             self._fg_next_step = NextStep.IDLE
@@ -180,7 +180,7 @@ class CoreIsolator(Isolator):
             if fg_instruction_ps > self._INST_PS_THRESHOLD:
                 self._bg_next_step = NextStep.IDLE
             elif fg_instruction_ps <= self._INST_PS_THRESHOLD and \
-                    self._foreground_wl.number_of_threads > len(self._foreground_wl.bound_cores):
+                    self._latency_critical_wls.number_of_threads > len(self._latency_critical_wls.bound_cores):
                 self._bg_next_step = NextStep.STRENGTHEN
 
         # ResourceType.MEMORY - If BG workload can strengthen its cores... , then strengthen BG's cores!
@@ -192,11 +192,11 @@ class CoreIsolator(Isolator):
 
         # FIXME: hard coded (contiguous allocation)
         # FG Next Step Decision
-        logger.debug(f'FG threads: {self._foreground_wl.number_of_threads}, '
-                     f'orig_bound_cores: {self._foreground_wl.orig_bound_cores}')
+        logger.debug(f'FG threads: {self._latency_critical_wls.number_of_threads}, '
+                     f'orig_bound_cores: {self._latency_critical_wls.orig_bound_cores}')
         if fg_instruction_ps < self._INST_PS_THRESHOLD \
                 and (self._bg_next_step is NextStep.STRENGTHEN or self._cur_bg_step - self._cur_fg_step > 1) \
-                and self._foreground_wl.number_of_threads > len(self._foreground_wl.orig_bound_cores):
+                and self._latency_critical_wls.number_of_threads > len(self._latency_critical_wls.orig_bound_cores):
             self._fg_next_step = NextStep.WEAKEN
         else:
             self._fg_next_step = NextStep.IDLE
@@ -209,8 +209,8 @@ class CoreIsolator(Isolator):
     def reset(self) -> None:
         if self._background_wl.is_running:
             self._background_wl.bound_cores = self._background_wl.orig_bound_cores
-        if self._foreground_wl.is_running:
-            self._foreground_wl.bound_cores = self._foreground_wl.orig_bound_cores
+        if self._latency_critical_wls.is_running:
+            self._latency_critical_wls.bound_cores = self._latency_critical_wls.orig_bound_cores
 
     def store_cur_config(self) -> None:
         self._stored_config = (self._cur_fg_step, self._cur_bg_step)

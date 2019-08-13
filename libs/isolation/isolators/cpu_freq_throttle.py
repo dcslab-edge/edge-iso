@@ -10,8 +10,8 @@ from ...workload import Workload
 
 
 class CPUFreqThrottleIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
-        super().__init__(foreground_wl, background_wls)
+    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+        super().__init__(latency_critical_wls, best_effort_wls)
 
         # FIXME: hard coded
         # Assumption: FG is latency-sensitive process (GPU) and BG is compute-intensive process (CPU)
@@ -44,14 +44,14 @@ class CPUFreqThrottleIsolator(Isolator):
         logger = logging.getLogger(__name__)
         freq = self._cpufreq_range[self._cur_step]
         # FIXME: It assumes all bgs are running on a single CPU socket, so we throttle freq.s for the one bg
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             logger.info(f'frequency of CPU cores of {bg_wl.name}\'s {bg_wl.bound_cores} is {freq / 1_000_000}GHz')
             bg_wl.cpu_dvfs.set_freq_cgroup(freq)
 
     def reset(self) -> None:
         max_freq = self._cpufreq_range[CPUDVFS.MAX_IDX]
         # FIXME: It assumes all bgs are running on a single CPU socket, so we throttle freq.s for the one bg
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             bg_wl.cpu_dvfs.set_freq_cgroup(max_freq)
 
     def store_cur_config(self) -> None:

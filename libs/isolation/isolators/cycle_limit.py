@@ -12,8 +12,8 @@ from ...workload import Workload
 
 class CycleLimitIsolator(Isolator):
 
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
-        super().__init__(foreground_wl, background_wls)
+    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+        super().__init__(latency_critical_wls, best_effort_wls)
 
         # FIXME: hard coded
         self._cur_step: int = Cpu.MAX_PERCENT
@@ -48,17 +48,17 @@ class CycleLimitIsolator(Isolator):
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             logger.info(f'limit_percentages of bound_cores of {bg_wl.name}\'s {bg_wl.bound_cores} is '
                         f'{self._cur_step}%')
 
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             Cpu.limit_cycle_percentage(bg_wl.group_name, self._cur_step)
 
     def reset(self) -> None:
         #print("cycle_limit reset")
         #print(self._background_wls)
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             Cpu.limit_cycle_percentage(bg_wl.group_name, Cpu.MAX_PERCENT)
 
     def store_cur_config(self) -> None:

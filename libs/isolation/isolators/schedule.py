@@ -12,11 +12,11 @@ from .. import NextStep
 
 
 class SchedIsolator(Isolator):
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
-        super().__init__(foreground_wl, background_wls)
+    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+        super().__init__(latency_critical_wls, best_effort_wls)
 
         # FIXME: hard coded (self._MAX_CORES is fixed depending on node type)
-        self._bgs_list = list(background_wls)
+        self._bgs_list = list(best_effort_wls)
         self._node_type = MachineChecker.get_node_type()
         if self._node_type == NodeType.IntegratedGPU:
             self._MAX_CORES = 4
@@ -100,7 +100,7 @@ class SchedIsolator(Isolator):
         # FIXME: hard coded
         # At most background processes can not preempt cores of the foreground process
         # FIXME: all bg tasks have the same number of cores (hard-coded)
-        fg_cores = self._foreground_wl.num_cores
+        fg_cores = self._latency_critical_wls.num_cores
         for bg, bg_bound_cores in self._cur_step.items():
             bg_cores = len(bg_bound_cores)
             if bg_cores + fg_cores > self._MAX_CORES or self.is_overlapped_assignment():
@@ -115,7 +115,7 @@ class SchedIsolator(Isolator):
         """
 
     def is_overlapped_assignment(self) -> bool:
-        fg_cores: Set[int] = self._foreground_wl.cgroup_cpuset.read_cpus()
+        fg_cores: Set[int] = self._latency_critical_wls.cgroup_cpuset.read_cpus()
         bg_cores: Set[int] = self._target_bg.cgroup_cpuset.read_cpus()
         overlapped = fg_cores & bg_cores
         if overlapped is not None:
@@ -142,7 +142,7 @@ class SchedIsolator(Isolator):
         and it is also used to run bg task alone.
         :return:
         """
-        for bg_wl in self._background_wls:
+        for bg_wl in self._best_effort_wls:
             if bg_wl.is_running:
                 bg_wl.bound_cores = bg_wl.orig_bound_cores
 

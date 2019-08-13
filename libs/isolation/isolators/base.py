@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Optional, Set
+from typing import Any, ClassVar, Optional, Set, Dict
 
 from .. import NextStep
 from .. import ResourceType
@@ -14,15 +14,22 @@ class Isolator(metaclass=ABCMeta):
     _DOD_THRESHOLD: ClassVar[float] = 0.005
     _FORCE_THRESHOLD: ClassVar[float] = 0.05
 
-    def __init__(self, foreground_wl: Workload, background_wls: Set[Workload]) -> None:
+    def __init__(self, latency_critical_wls: Set[Workload], best_effort_wls: Set[Workload]) -> None:
         self._prev_metric_diff: MetricDiff = None
 
-        self._foreground_wl = foreground_wl
-        self._background_wls = background_wls
+        self._latency_critical_wls = latency_critical_wls
+        self._best_effort_wls = best_effort_wls
+        self._target_wl = None
 
-        # FIXME: All BGs have same NextStep (All BGs are homogeneous)
-        self._fg_next_step = NextStep.IDLE
-        self._bg_next_steps = NextStep.IDLE
+        # FIXME: All FGs, BGs can have different NextStep (Currently, All WLs are homogeneous)
+        self._lc_wl_next_steps: Dict[Workload, NextStep] = dict()
+        self._be_wl_next_steps: Dict[Workload, NextStep] = dict()
+
+        for k in self._lc_wl_next_steps.keys():
+            self._lc_wl_next_steps[k] = NextStep.IDLE
+
+        for k in self._be_wl_next_steps.keys():
+            self._be_wl_next_steps[k] = NextStep.IDLE
 
         self._is_first_decision: bool = True
         self._cur_dominant_resource_cont: ResourceType = None
@@ -32,10 +39,18 @@ class Isolator(metaclass=ABCMeta):
     def __del__(self):
         self.reset()
 
+    @property
+    def target_wl(self) -> None:
+        return self._target_wl
+
+    @target_wl.setter
+    def target_wl(self, new_target_wl: Workload) -> None:
+        self._target_wl = new_target_wl
+
     @abstractmethod
     def strengthen(self) -> 'Isolator':
         """
-        Adjust the isolation parameter to allocate more resources to the foreground workload.
+        Adjust the isolation parameter to allocate more resources to latency-critical workloads.
         (Does not actually isolate)
 
         :return: current isolator object for method chaining
@@ -56,7 +71,7 @@ class Isolator(metaclass=ABCMeta):
     @abstractmethod
     def weaken(self) -> 'Isolator':
         """
-        Adjust the isolation parameter to allocate less resources to the foreground workload.
+        Adjust the isolation parameter to allocate less resources to latency-critical workloads.
         (Does not actually isolate)
 
         :return: current isolator object for method chaining
@@ -85,6 +100,8 @@ class Isolator(metaclass=ABCMeta):
         self._is_first_decision = True
 
     def _first_decision(self, cur_metric_diff: MetricDiff) -> NextStep:
+        # FIXME: first decision for latency-critical workloads
+
         curr_diff = self._get_metric_type_from(cur_metric_diff)
 
         logger = logging.getLogger(__name__)
@@ -104,6 +121,8 @@ class Isolator(metaclass=ABCMeta):
                 return NextStep.WEAKEN
 
     def _monitoring_result(self, prev_metric_diff: MetricDiff, cur_metric_diff: MetricDiff) -> NextStep:
+        # FIXME: monitoring_result for latency-critical workloads
+
         curr_diff = self._get_metric_type_from(cur_metric_diff)
         prev_diff = self._get_metric_type_from(prev_metric_diff)
         diff_of_diff = curr_diff - prev_diff
@@ -131,9 +150,42 @@ class Isolator(metaclass=ABCMeta):
     @abstractmethod
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         pass
+    """
+    def choose_workload_for_isolation(self) -> Workload:
+        logger = logging.getLogger(__name__)
+
+        target_lc_wl = None
+        min_inst_diff = 0
+        for lc_wl in self._latency_critical_wls:
+            curr_metric_diff = lc_wl.calc_metric_diff()
+            curr_inst_diff = curr_metric_diff.instruction_ps
+            if curr_inst_diff < min_inst_diff:
+                min_inst_diff = curr_inst_diff
+                target_lc_wl = lc_wl
+
+        if target_lc_wl is None:
+            logger.info(f'target_lc_wl is None!')
+        if target_lc_wl is not None:
+            logger.info(f'lowest_instruction_diff target_lc_wl: {target_lc_wl.name}-{target_lc_wl.pid}, '
+                        f'inst_diff: {min_inst_diff}')
+
+        return target_lc_wl
+    """
 
     def decide_next_step(self) -> NextStep:
-        curr_metric_diff = self._foreground_wl.calc_metric_diff()
+        # FIXME: Fix code to work for `multiple` latency-critical workloads
+        """
+        Deciding the next step for current isolator
+        isolation is performed at a time
+        :return:
+        """
+
+        #target_lc_wl = self.choose_workload_for_isolation()
+
+        if self._target_wl is None:
+            return NextStep.IDLE
+
+        curr_metric_diff = self._target_wl.calc_metric_diff()
 
         if self._is_first_decision:
             self._is_first_decision = False
@@ -151,12 +203,13 @@ class Isolator(metaclass=ABCMeta):
         """Restore to initial configuration"""
         pass
 
-    def change_fg_wl(self, new_workload: Workload) -> None:
-        self._foreground_wl = new_workload
-        self._prev_metric_diff = new_workload.calc_metric_diff()
+    def change_lc_wls(self, new_workloads: Set[Workload]) -> None:
+        #self._foreground_wl = new_workload
+        self._latency_critical_wls = new_workloads
+        #self._prev_metric_diff = new_workload.calc_metric_diff()
 
-    def change_bg_wls(self, new_workloads: Set[Workload]) -> None:
-        self._background_wls = new_workloads
+    def change_be_wls(self, new_workloads: Set[Workload]) -> None:
+        self._best_effort_wls = new_workloads
 
     @abstractmethod
     def store_cur_config(self) -> None:
