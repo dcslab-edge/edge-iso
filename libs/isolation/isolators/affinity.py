@@ -1,59 +1,125 @@
 # coding: UTF-8
 
 import logging
-from typing import Optional, Set
+import random
+from typing import Optional, Set, Dict, Tuple
+
+from ..policies.base import IsolationPolicy
 
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
 from ...workload import Workload
+from ...utils.machine_type import MachineChecker, NodeType
 
 
 class AffinityIsolator(Isolator):
-    def __init__(self, latency_critical_wls: Workload, best_effort_wls: Set[Workload]) -> None:
+    def __init__(self, latency_critical_wls: Set[Workload], best_effort_wls: Set[Workload]) -> None:
         super().__init__(latency_critical_wls, best_effort_wls)
 
-        self._cur_step: int = self._latency_critical_wls.orig_bound_cores[-1]
+        self._cur_steps: Dict[Workload, Tuple[int]] = dict()
+        for lc_wl in latency_critical_wls:
+            self._cur_steps[lc_wl] = lc_wl.orig_bound_cores
+        for be_wl in best_effort_wls:
+            self._cur_steps[be_wl] = be_wl.orig_bound_cores
 
-        self._stored_config: Optional[int] = None
+        # FIXME: hard-coded for Jetson TX2
+        self._node_type = MachineChecker.get_node_type()
+        if self._node_type is NodeType.IntegratedGPU:
+            # FIXME: hard-coded part (core range)
+            self._all_cores = tuple([0, 3, 4, 5])
+            self._MIN_CORES = 1
+        elif self._node_type is NodeType.DiscreteGPU:
+            # FIXME: hard-coded part (core range)
+            self._all_cores = tuple(range(0, 8, 1))
+            self._MIN_CORES = 1
+        self._available_cores: Optional[Tuple[int]] = IsolationPolicy.available_cores()
+        self._chosen_alloc: Optional[int] = None
+        self._chosen_dealloc: Optional[int] = None
+        self._cur_alloc: Optional[Tuple[int]] = None
+        self._cur_dealloc: Optional[Tuple[int]] = None
+
+        self._stored_config: Optional[Dict[Workload, Tuple[int]]] = None
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
-        return metric_diff.instruction_ps
+        return metric_diff.instruction_ps - metric_diff.diff_slack
 
     def strengthen(self) -> 'AffinityIsolator':
-        self._cur_step += 1
+        # FIXME: AffinityIsolator should contain each workload's core affinity
+        # TODO: This function (randomly) allocates more cores to workload.
+        wl = self.perf_target_wl
+        self.get_available_cores()
+        if len(self._available_cores) > 0:
+            self._chosen_alloc = random.choice(self._available_cores)
+        else:
+            self._chosen_alloc = None
+        self._cur_alloc = tuple(self._cur_steps[wl]+tuple(self._chosen_alloc))
         return self
 
     @property
     def is_max_level(self) -> bool:
-        # FIXME: hard coded
-        for bg_wl in self._best_effort_wls:
-            if self._cur_step + 1 == bg_wl.bound_cores[0]:
-                return True
-        return False
+        # Check available cores and excess cpu flag (either one on both conditions should be met)
+        self.get_available_cores()
+        return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True
 
     @property
     def is_min_level(self) -> bool:
-        return self._latency_critical_wls.orig_bound_cores == self._latency_critical_wls.bound_cores
+        return len(self.dealloc_target_wl.bound_cores) - 1 < self._MIN_CORES
 
     def weaken(self) -> 'AffinityIsolator':
-        self._cur_step -= 1
+        # TODO: This function (randomly) deallocates cores from workload.
+        wl = self.perf_target_wl
+        if len(wl.bound_cores) > 1:
+            self._chosen_dealloc = random.choice(wl.bound_cores)
+        else:
+            self._chosen_dealloc = None
+        self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
         return self
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
-        logger.info(f'affinity of foreground is {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_step}')
+        #logger.info(f'affinity of foreground is {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_step}')
 
-        self._latency_critical_wls.bound_cores = range(self._latency_critical_wls.orig_bound_cores[0], self._cur_step + 1)
+        if self._cur_alloc is not None:
+            self.alloc_target_wl.bound_cores = self._cur_alloc
+            self._cur_steps[self.alloc_target_wl] = self._cur_alloc
+            self._update_other_values("alloc")
+            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
+        elif self._cur_dealloc is not None:
+            self.dealloc_target_wl.bound_cores = self._cur_dealloc
+            self._cur_steps[self.dealloc_target_wl] = self._cur_dealloc
+            self._update_other_values("dealloc")
+            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
 
     def reset(self) -> None:
-        if self._latency_critical_wls.is_running:
-            self._latency_critical_wls.bound_cores = self._latency_critical_wls.orig_bound_cores
+        for lc_wl in self._latency_critical_wls:
+            if lc_wl.is_running:
+                lc_wl.bound_cores = lc_wl.orig_bound_cores
+        #if self._latency_critical_wls.is_running:
+        #    self._latency_critical_wls.bound_cores = self._latency_critical_wls.orig_bound_cores
 
     def store_cur_config(self) -> None:
-        self._stored_config = self._cur_step
+        self._stored_config = self._cur_steps
 
     def load_cur_config(self) -> None:
         super().load_cur_config()
 
-        self._cur_step = self._stored_config
+        self._cur_steps = self._stored_config
         self._stored_config = None
+
+    def _update_other_values(self, action: str) -> None:
+        if action is "alloc":
+            self._available_cores = tuple(filter(lambda x: x is not self._chosen_alloc, self._available_cores))
+            self.set_available_cores()
+            self._cur_alloc = None
+            self._chosen_alloc = None
+        elif action is "dealloc":
+            self._available_cores = tuple(self._available_cores + self._chosen_dealloc)
+            self.set_available_cores()
+            self._cur_dealloc = None
+            self._chosen_dealloc = None
+
+    def get_available_cores(self) -> None:
+        self._available_cores = IsolationPolicy.available_cores
+
+    def set_available_cores(self) -> None:
+        IsolationPolicy.set_available_cores(self._available_cores)

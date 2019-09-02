@@ -19,7 +19,9 @@ class Isolator(metaclass=ABCMeta):
 
         self._latency_critical_wls = latency_critical_wls
         self._best_effort_wls = best_effort_wls
-        self._target_wl = None
+        self._perf_target_wl = None
+        self._alloc_target_wl = None
+        self._dealloc_target_wl = None
 
         # FIXME: All FGs, BGs can have different NextStep (Currently, All WLs are homogeneous)
         self._lc_wl_next_steps: Dict[Workload, NextStep] = dict()
@@ -37,15 +39,32 @@ class Isolator(metaclass=ABCMeta):
         self._stored_config: Optional[Any] = None
 
     def __del__(self):
-        self.reset()
+        if len(self._latency_critical_wls) == 0:
+            self.reset()
 
     @property
-    def target_wl(self) -> None:
-        return self._target_wl
+    def perf_target_wl(self) -> Workload:
+        return self._perf_target_wl
 
-    @target_wl.setter
-    def target_wl(self, new_target_wl: Workload) -> None:
-        self._target_wl = new_target_wl
+    @perf_target_wl.setter
+    def perf_target_wl(self, new_perf_target_wl: Workload) -> None:
+        self._perf_target_wl = new_perf_target_wl
+
+    @property
+    def alloc_target_wl(self) -> Workload:
+        return self._alloc_target_wl
+
+    @alloc_target_wl.setter
+    def alloc_target_wl(self, new_alloc_target_wl: Workload) -> None:
+        self._alloc_target_wl = new_alloc_target_wl
+
+    @property
+    def dealloc_target_wl(self) -> Workload:
+        return self._dealloc_target_wl
+
+    @dealloc_target_wl.setter
+    def dealloc_target_wl(self, new_dealloc_target_wl: Workload) -> None:
+        self._dealloc_target_wl = new_dealloc_target_wl
 
     @abstractmethod
     def strengthen(self) -> 'Isolator':
@@ -180,12 +199,10 @@ class Isolator(metaclass=ABCMeta):
         :return:
         """
 
-        #target_lc_wl = self.choose_workload_for_isolation()
-
-        if self._target_wl is None:
+        if self._perf_target_wl is None:
             return NextStep.IDLE
 
-        curr_metric_diff = self._target_wl.calc_metric_diff()
+        curr_metric_diff = self._perf_target_wl.calc_metric_diff()
 
         if self._is_first_decision:
             self._is_first_decision = False
