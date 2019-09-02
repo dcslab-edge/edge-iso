@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import ClassVar, Dict, Tuple, Type, Set, Iterable, Optional
+from typing import ClassVar, Dict, Tuple, Type, Set, Iterable, Optional, Any
 
 from .. import ResourceType
 from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, \
@@ -17,35 +17,44 @@ from ...utils.machine_type import MachineChecker, NodeType
 class IsolationPolicy(metaclass=ABCMeta):
     _IDLE_ISOLATOR: ClassVar[IdleIsolator] = IdleIsolator()
     _VERIFY_THRESHOLD: ClassVar[int] = 3
+    _available_cores: Optional[Tuple[int]] = None
 
     def __init__(self, lc_wls: Set[Workload], be_wls: Set[Workload]) -> None:
         self._lc_wls = lc_wls
         self._be_wls = be_wls
+        self._all_wls = lc_wls | be_wls
+
+        self._perf_target_wl = None  # selected workload to for alloc/dealloc)
 
         self._node_type = MachineChecker.get_node_type()
         # TODO: Discrete GPU case
-        if self._node_type == NodeType.CPU:\
-
+        if self._node_type == NodeType.CPU:
+            self._all_cores = tuple(range(0, 8, 1))
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
                 (CycleLimitIsolator, CycleLimitIsolator(self._lc_wls, self._be_wls)),
                 (SchedIsolator, SchedIsolator(self._lc_wls, self._be_wls)),
             ))
         if self._node_type == NodeType.IntegratedGPU:
+            self._all_cores = tuple([0, 3, 4, 5])
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
                 (AffinityIsolator, AffinityIsolator(self._lc_wls, self._be_wls)),
                 (CycleLimitIsolator, CycleLimitIsolator(self._lc_wls, self._be_wls)),
                 (GPUFreqThrottleIsolator, GPUFreqThrottleIsolator(self._lc_wls, self._be_wls)),
                 (SchedIsolator, SchedIsolator(self._lc_wls, self._be_wls))
             ))
-        self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR
+        self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR   # isolator init
+        # TODO: cur_metric can be extended to maintain various resource contention for workloads
+        self._cur_metrics: Dict[str, Dict[Workload, Any]] = dict()      # workload metric init
 
         self._in_solorun_profiling_stage: bool = False
         self._cached_lc_num_threads: Dict[Workload, int] = dict()
         for lc_wl in self._lc_wls:
             self._cached_lc_num_threads[lc_wl] = lc_wl.number_of_threads
         self._solorun_verify_violation_count: Dict[Workload, int] = dict()
+        #self._available_cores: Optional[Tuple[int]] = None
         self._all_lc_cores = set()
         self._all_be_cores = set()
+        self.update_allocated_cores()   # Update allocated cores after initialization
         self._excess_cpu_wls = set()
 
     def __hash__(self) -> int:
@@ -142,6 +151,14 @@ class IsolationPolicy(metaclass=ABCMeta):
     @property
     def all_be_cores(self) -> Set[int]:
         return self._all_be_cores
+
+    @classmethod
+    def available_cores(cls) -> Tuple[int]:
+        return cls._available_cores
+
+    @classmethod
+    def set_available_cores(cls, new_values) -> None:
+        cls._available_cores = new_values
 
     @property
     def ended(self) -> bool:
@@ -281,7 +298,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         return not self._in_solorun_profiling_stage and self.check_lc_wls_metrics() and self._lc_wls.calc_metric_diff().verify()
     """
 
-    # Multiple BGs related
+    # for supporting multiple workloads
 
     def check_any_bg_running(self) -> bool:
         not_running_bgs = 0
@@ -321,6 +338,8 @@ class IsolationPolicy(metaclass=ABCMeta):
             logger.info(f'return True')
             return True
 
+    # for CPU core allocation
+
     def update_allocated_cores(self):
         logger = logging.getLogger(__name__)
 
@@ -337,6 +356,8 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         self._all_lc_cores = all_lc_cores
         self._all_be_cores = all_be_cores
+        available_cores = tuple(set(self._all_cores) - set(self._all_lc_cores) - set(self._all_be_cores))
+        IsolationPolicy.set_available_cores(available_cores)
 
     def update_excess_cpus_wls(self):
         for lc_wl in self._lc_wls:
@@ -356,148 +377,225 @@ class IsolationPolicy(metaclass=ABCMeta):
         else:
             return False
 
-    @staticmethod
-    def choose_wl_of_negative_ips_diff(set_of_wl: Set[Workload]) -> Workload:
+    # for choosing a workload to monitoring performance (sorting & choosing)
+
+    def update_all_workloads_res_info(self) -> None:
+        metrics = ['mem_bw', 'mem_bw_diff', 'llc_hr_diff', 'instr_diff']
+        for wl in self._all_wls:
+            wl.update_calc_metrics()
+            for metric in metrics:
+                self._cur_metrics[metric][wl] = wl.calc_metrics[metric]
+
+    def choosing_wl_for(self, objective: str, sort_criteria: str, highest: bool) -> None:
         """
-        Choose most contentious workload or SLO-violated workload in terms of `instruction diff`
+        This function is used for choosing workload subject to certain condition.
+        :param objective: It indicates the intention for choosing workload (weaken, strengthen, or victim)
+        :param sort_criteria: It indicates the sorting criteria (i.e., mem_bw for strengthen, mem_bw_diff for weaken)
+        :param highest: It indicates the sort direction (e.g., True -> descending or False -> ascending)
         :return:
         """
+        # TODO: This function only choose a workload of the highest memory diff
+        # FIXME: This function should override the `self._alloc_target_wl` & `self._dealloc_target_wl`
         logger = logging.getLogger(__name__)
-
-        target_wl = None
-        min_inst_diff = 0
-        for wl in set_of_wl:
-            curr_metric_diff = wl.calc_metric_diff()
-            curr_inst_diff = curr_metric_diff.instruction_ps
-            if curr_inst_diff < min_inst_diff:
-                min_inst_diff = curr_inst_diff
-                target_wl = wl
-
-        if target_wl is None:
-            logger.info(f'target_wl ([{target_wl.wl_type}] {target_wl.name}-{target_wl.pid}) is None!')
-        if target_wl is not None:
-            logger.info(f'lowest_instruction_diff target_wl: [{target_wl.wl_type}] '
-                        f'{target_wl.name}-{target_wl.pid}, '
-                        f'inst_diff: {min_inst_diff}')
-
-        return target_wl
-
-    @staticmethod
-    def choose_wl_of_positive_ips_diff(set_of_wl: Set[Workload]) -> Workload:
-        """
-        Choose least contentious workload or SLO-compliant workload in terms of `instruction diff`
-        :return:
-        """
-        logger = logging.getLogger(__name__)
-
-        target_wl = None
-        max_inst_diff = -1000
-        for wl in set_of_wl:
-            curr_metric_diff = wl.calc_metric_diff()
-            curr_inst_diff = curr_metric_diff.instruction_ps
-            if curr_inst_diff > max_inst_diff:
-                max_inst_diff = curr_inst_diff
-                target_wl = wl
-
-        if target_wl is None:
-            logger.info(f'target_wl ([{target_wl.wl_type}] {target_wl.name}-{target_wl.pid}) is None!')
-        if target_wl is not None:
-            logger.info(f'lowest_instruction_diff target_wl: [{target_wl.wl_type}] '
-                        f'{target_wl.name}-{target_wl.pid}, '
-                        f'inst_diff: {max_inst_diff}')
-
-        return target_wl
-
-    def choose_workload_to_be_allocated(self) -> Workload:
-        """
-        This function finds which workload should be prioritized for performance improvement
-        :return:
-        """
-        logger = logging.getLogger(__name__)
-        target_wl = None
-        target_lc_wl = self.choose_wl_of_negative_ips_diff(self._lc_wls)
-        if target_lc_wl is None:
-            logger.info('Not any latency-critical workload is chosen!')
-            target_be_wl = self.choose_wl_of_negative_ips_diff(self._be_wls)
-            if target_be_wl is None:
-                logger.info('Not any workload is running!')
-            elif target_be_wl is not None:
-                target_wl = target_be_wl
-                logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
-        elif target_lc_wl is not None:
-            logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
-            target_wl = target_lc_wl
-
-        return target_wl
-
-    def choose_workload_to_be_deallocated(self) -> Workload:
-        """
-        This function finds which workload should be prioritized for performance improvement
-        :return:
-        """
-        # FIXME: target workload for deallocation needs to be changed!! (BE first & LC last)
-        logger = logging.getLogger(__name__)
-        target_wl = None
-        target_be_wl = self.choose_wl_of_positive_ips_diff(self._be_wls)
-        if target_be_wl is None:
-            logger.info('Not any best-effort workload is chosen!')
-            target_lc_wl = self.choose_wl_of_positive_ips_diff(self._lc_wls)
-            if target_lc_wl is None:
-                logger.info('Not any workload is running!')
-            elif target_lc_wl is not None:
-                target_wl = target_lc_wl
-                logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
-        elif target_be_wl is not None:
-            logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
-            target_wl = target_be_wl
-
-        return target_wl
-
-    """
-    def most_contentious_workload(self) -> Workload:
-        
-        This function finds the most contentious workload, which has the largest diffs
-        among multiple workloads (including LC & BE)
-        :return:
-        
-
-        lc_diffs = list()
-        be_diffs = list()
-        if len(self._lc_wls) > 0:
-            for lc_wl in self._lc_wls:
-                lc_metric_diff = lc_wl.calc_metric_diff()
-                lc_diffs.append((lc_wl, lc_metric_diff))
-            target_diffs = lc_diffs
+        if self._cur_isolator is AffinityIsolator:
+            # Affinity isolator performs isolation on `self._perf_target_wl`
+            excluded: Iterable = ()
         else:
-            if len(self._be_wls) > 0:
-                for be_wl in self._be_wls:
-                    be_metric_diff = be_wl.calc_metric_diff()
-                    be_diffs.append((be_wl, be_metric_diff))
-                target_diffs = be_diffs
-        
-        # tuple is sorted in descending order (e.g., -5, -4, -3, ... , -1, 0)
-        # TODO: How can we sorting different diffs? metric_diff is 2-dim or 3-dim tuple
-        sorted_tuple_list = sorted(target_diffs, key=lambda x: x[1])
-        return sorted_tuple_list[0][0]
-        """
+            # other isolators do not perform isolation on `self._perf_target_wl`
+            excluded: Iterable = (self._perf_target_wl, )
 
+        # update resource info
+        self.update_all_workloads_res_info()
 
+        # sorting workloads by sort_criteria (metric_type)
+        wls_info = tuple(sorted(self._cur_metrics[sort_criteria].items(), key=lambda x: x[1], reverse=highest))
+        chosen = False
+        idx = 0
 
-    """
-    # It is not used 
-    def check_cores_are_overlapped(self) -> bool:
-        logger = logging.getLogger(__name__)
-        
-        all_lc_cores = set()
-        for lc_wl in self._lc_wls:
-            lc_cores: Set[int] = lc_wl.cgroup_cpuset.read_cpus()
-            all_lc_cores.add(lc_cores)
-            
-        for bg_wl in self._be_wls:
-            bg_cores: Set[int] = bg_wl.cgroup_cpuset.read_cpus()
-            overlapped = fg_cores & bg_cores
-            if overlapped is not None:
-                return True
-            else:
-                return False
-    """
+        if wls_info is None:
+            logger.info(f"There is no any workloads to sort!")
+            self._cur_isolator.alloc_target_wl = None
+            self._cur_isolator.dealloc_target_wl = None
+            self._cur_isolator.perf_target_wl = None
+            return
+
+        # Choosing a workload which has the highest (or the lowest) values for a given metric
+        candidate = tuple(filter(lambda x: x[0] not in excluded, wls_info))
+        num_candidates = len(candidate)
+        while not chosen and idx < num_candidates-1:
+            candidate = tuple(filter(lambda x: x[0] not in excluded, wls_info))
+            cur_target_wl: Workload = candidate[idx][0]   # idx is the ordinal position from the very first one
+            # cur_memory_bw_diff is criteria for choosing a deallocable candidate for weakening
+            # cur_memory_bw is criteria for choosing an allocable candidate for strengthening
+            if objective is "victim":
+                self._cur_isolator.perf_target_wl = cur_target_wl
+                chosen = True
+                continue
+
+            if self._cur_isolator is not AffinityIsolator:
+                if objective is "strengthen":
+                    if not self._cur_isolator.is_max_level:
+                        self._cur_isolator.dealloc_target_wl = cur_target_wl
+                        chosen = True
+                        continue
+                    else:
+                        excluded += cur_target_wl
+                elif objective is "weaken":
+                    if not self._cur_isolator.is_min_level:
+                        self._cur_isolator.alloc_target_wl = cur_target_wl
+                        chosen = True
+                        continue
+                    else:
+                        excluded += cur_target_wl
+            elif self._cur_isolator is AffinityIsolator:
+                # Setting cur_target_wl as `perf_target_wl`
+                cur_target_wl = self._cur_isolator.perf_target_wl
+                if objective is "strengthen":
+                    if not self._cur_isolator.is_max_level:
+                        self._cur_isolator.alloc_target_wl = cur_target_wl
+                        chosen = True
+                        continue
+                    else:
+                        excluded += cur_target_wl
+                elif objective is "weaken":
+                    if not self._cur_isolator.is_min_level:
+                        self._cur_isolator.dealloc_target_wl = cur_target_wl
+                        chosen = True
+                        continue
+                    else:
+                        excluded += cur_target_wl
+            idx += 1
+
+        # If it is not chosen, initialize all other variables
+        if not chosen:
+            logger.info(f"There is no chosen workload for {objective}, "
+                        f"objective:{objective}, chosen: {chosen}")
+            if objective is "strengthen" or "weaken":
+                self._cur_isolator.alloc_target_wl = None
+                self._cur_isolator.dealloc_target_wl = None
+            if objective is "victim":
+                self._cur_isolator.perf_target_wl = None
+
+        logger.info(f"Chosen Workloads for {self._cur_isolator}")
+        logger.info(f"for perf_target: {self._cur_isolator.perf_target_wl},"
+                    f"for alloc: {self._cur_isolator.alloc_target_wl},"
+                    f"for dealloc: {self._cur_isolator.dealloc_target_wl}")
+
+    #
+    # @staticmethod
+    # def choose_wl_of_diff(set_of_wl: Set[Workload], res_type: ResourceType, lowest_diff: bool) -> Workload:
+    #     """
+    #     Choose a workload which has either the highest or the lowest diff.
+    #     It is decided based on resource type and reverse flag (e.g., max diff or min diff)
+    #     :res_type: ResourceType which needs to be sorted
+    #     :is_lowest: if True, then it chooses the lowest diff, otherwise, it chooses the highest diff
+    #     :return:
+    #     """
+    #     logger = logging.getLogger(__name__)
+    #
+    #     target_wl = None
+    #     min_diff = 0
+    #     max_diff = -1000
+    #
+    #     for wl in set_of_wl:
+    #         curr_metric_diff = wl.calc_metric_diff()
+    #         if res_type is ResourceType.CPU:
+    #             curr_diff = curr_metric_diff.instruction_ps
+    #         elif res_type is ResourceType.CACHE:
+    #             curr_diff = curr_metric_diff.llc_hit_ratio
+    #         else:
+    #             # if res_type is ResourceType.MEMORY
+    #             curr_diff = curr_metric_diff.local_mem_util_ps
+    #
+    #         if lowest_diff is True:
+    #             if curr_diff < min_diff:
+    #                 min_diff = curr_diff
+    #                 target_wl = wl
+    #         elif lowest_diff is False:
+    #             if curr_diff > max_diff:
+    #                 max_diff = curr_diff
+    #                 target_wl = wl
+    #
+    #     if target_wl is None:
+    #         logger.info(f'target_wl ([{target_wl.wl_type}] {target_wl.name}-{target_wl.pid}) is None!')
+    #     if target_wl is not None:
+    #         if lowest_diff is True:
+    #             logger.info(f'lowest_diff target_wl: [{target_wl.wl_type}] '
+    #                         f'{target_wl.name}-{target_wl.pid}, '
+    #                         f'the_lowest_diff: {min_diff}')
+    #         elif lowest_diff is False:
+    #             logger.info(f'highest_diff target_wl: [{target_wl.wl_type}] '
+    #                         f'{target_wl.name}-{target_wl.pid}, '
+    #                         f'the_highest_diff: {max_diff}')
+    #
+    #     return target_wl
+    #
+    # def choose_workload_for_alloc(self) -> Workload:
+    #     """
+    #     This function finds which workload should be prioritized for performance improvement
+    #     :return:
+    #     """
+    #     logger = logging.getLogger(__name__)
+    #     target_wl = None
+    #     target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=ResourceType.CPU, lowest_diff=True)
+    #     if target_lc_wl is None:
+    #         logger.info('Not any latency-critical workload is chosen!')
+    #         target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=ResourceType.CPU, lowest_diff=True)
+    #         if target_be_wl is None:
+    #             logger.info('Not any workload is running!')
+    #         elif target_be_wl is not None:
+    #             target_wl = target_be_wl
+    #             logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
+    #     elif target_lc_wl is not None:
+    #         logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
+    #         target_wl = target_lc_wl
+    #
+    #     return target_wl
+    #
+    # def choose_workload_for_dealloc_v1(self) -> Workload:
+    #     """
+    #     This function chooses a workload that has less sensitive to the contention.
+    #     (highest diff value for corresponding isolator)
+    #     :return:
+    #     """
+    #     # FIXME: target workload for deallocation needs to be changed!! (BE first & LC last)
+    #     logger = logging.getLogger(__name__)
+    #     target_wl = None
+    #     target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=ResourceType.CPU, lowest_diff=False)
+    #     if target_be_wl is None:
+    #         logger.info('Not any best-effort workload is chosen!')
+    #         target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=ResourceType.CPU, lowest_diff=False)
+    #         if target_lc_wl is None:
+    #             logger.info('Not any workload is running!')
+    #         elif target_lc_wl is not None:
+    #             target_wl = target_lc_wl
+    #             logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
+    #     elif target_be_wl is not None:
+    #         logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
+    #         target_wl = target_be_wl
+    #
+    #     return target_wl
+    #
+    # def choose_workload_for_dealloc_v2(self, res_type: ResourceType) -> Workload:
+    #     """
+    #     This function chooses a workload that has less sensitive to the contention.
+    #     (highest diff value for corresponding isolator)
+    #     :return:
+    #     """
+    #     # FIXME: target workload for deallocation needs to be changed!! (BE first & LC last)
+    #     logger = logging.getLogger(__name__)
+    #     target_wl = None
+    #     target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=res_type, lowest_diff=False)
+    #     if target_be_wl is None:
+    #         logger.info('Not any best-effort workload is chosen!')
+    #         target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=res_type, lowest_diff=False)
+    #         if target_lc_wl is None:
+    #             logger.info('Not any workload is running!')
+    #         elif target_lc_wl is not None:
+    #             target_wl = target_lc_wl
+    #             logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
+    #     elif target_be_wl is not None:
+    #         logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
+    #         target_wl = target_be_wl
+    #
+    #     return target_wl

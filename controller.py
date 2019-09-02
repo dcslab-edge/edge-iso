@@ -85,10 +85,13 @@ class Controller:
 
                 if group.new_isolator_needed:
                     #print(group)
+                    # workloads and isolator are selected in the below code
                     group.choose_next_isolator()
 
                 cur_isolator: Isolator = group.cur_isolator
 
+                # FIXME: decide_next_step belongs to isolator
+                # `calc_metric_diff()` is invoked in the below code to determine `next_step`.
                 decided_next_step: NextStep = cur_isolator.decide_next_step()
                 logger.info(f'Monitoring Result : {decided_next_step.name}')
 

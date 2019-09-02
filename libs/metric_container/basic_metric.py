@@ -107,7 +107,8 @@ class MetricDiff:
     if NODE_TYPE == NodeType.CPU:
         _MAX_MEM_BANDWIDTH_PS = 24 * 1024 * 1024 * 1024     # MemBW measured by Intel VTune
 
-    def __init__(self, curr: BasicMetric, prev: BasicMetric, core_norm: float = 1) -> None:
+    def __init__(self, curr: BasicMetric, prev: BasicMetric, core_norm: float = 1, diff_slack: float = 0.0) -> None:
+        self._diff_slack = diff_slack
         self._llc_hit_ratio = curr.llc_hit_ratio - prev.llc_hit_ratio
 
         if curr.llc_miss_ps == 0:
@@ -135,7 +136,11 @@ class MetricDiff:
     def instruction_ps(self) -> float:
         return self._instruction_ps
 
-    def calc_by_diff_slack(self, diff_slack: float) -> Tuple[Tuple[ResourceType, float], ...]:
+    @property
+    def diff_slack(self) -> float:
+        return self._diff_slack
+
+    def calc_by_diff_slack(self, diff_slack: Optional[float]) -> Tuple[Tuple[ResourceType, float], ...]:
         # NOTE: diff_slack is positive float value
         resource_slacks = ()
 
@@ -143,10 +148,16 @@ class MetricDiff:
                      (ResourceType.CACHE, self._llc_hit_ratio),
                      (ResourceType.MEMORY, self._llc_miss_ps))
 
+        # Explicitly re-assigning diff_slack
+        if diff_slack is not None:
+            self._diff_slack = diff_slack
+
         # Calculating slack from pre-defined diff value
         # `resource_slacks` contains all diffs re-calculated using `diff_slack`
+        # diff_slack > 0: making more sensitive to the contention
+        # diff_slack < 0: making less sensitive to the contention
         for res, val in orig_diff:
-            resource_slacks += ((res, val - diff_slack),)
+            resource_slacks += ((res, val - self._diff_slack),)
 
         return resource_slacks
 

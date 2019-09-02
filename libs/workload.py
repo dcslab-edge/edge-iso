@@ -2,7 +2,7 @@
 
 from collections import deque
 from itertools import chain
-from typing import Deque, Iterable, Optional, Set, Tuple
+from typing import Deque, Iterable, Optional, Set, Tuple, Dict, Any
 from pathlib import Path
 
 import psutil
@@ -46,10 +46,13 @@ class Workload:
         if wl_type == 'BE':
             self._avg_solorun_data = data_map[name]
 
+        # metric used to various isolation
+        self._calc_metrics: Dict[str, Any] = dict()
+
         self._orig_bound_cores: Tuple[int, ...] = tuple(self._cgroup_cpuset.read_cpus())
         self._orig_bound_mems: Set[int] = self._cgroup_cpuset.read_mems()
         self._excess_cpu_flag = False   # flag indicating unused cpu cores exist
-        self._diff_slack = None         # slack for expressing diverse SLOs (by controlling resource contention diff)
+        self._diff_slack = 0            # slack for expressing diverse SLOs (by controlling resource contention diff)
 
     def __repr__(self) -> str:
         return f'{self._name} (pid: {self._pid})'
@@ -176,9 +179,21 @@ class Workload:
     def avg_solorun_data(self, new_data: BasicMetric) -> None:
         self._avg_solorun_data = new_data
 
+    @property
+    def calc_metrics(self) -> Dict[str, Any]:
+        return self._calc_metrics
+
+    def update_calc_metrics(self) -> None:
+        # TODO: cur_metric can be extended to maintain various resource contention for workloads
+        curr_metric_diff = self.calc_metric_diff()
+        self._calc_metrics['mem_bw'] = BasicMetric.calc_avg(self._metrics, 30).llc_miss_ps
+        self._calc_metrics['mem_bw_diff'] = curr_metric_diff.local_mem_util_ps
+        self._calc_metrics['instr_diff'] = curr_metric_diff.instruction_ps
+        self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio
+
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         curr_metric: BasicMetric = self._metrics[0]
-        return MetricDiff(curr_metric, self._avg_solorun_data, core_norm)
+        return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
     def all_child_tid(self) -> Tuple[int, ...]:
         try:
@@ -202,7 +217,6 @@ class Workload:
             self._is_gpu_task = 0
         except (ValueError, IndexError, AttributeError):
             self._is_gpu_task = 0
-
 
     """
     def check_gpu_task(self) -> None:
