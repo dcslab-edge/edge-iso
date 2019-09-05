@@ -150,9 +150,9 @@ class SchedIsolator(Isolator):
         and it is also used to run bg task alone.
         :return:
         """
-        for bg_wl in self._best_effort_wls:
-            if bg_wl.is_running:
-                bg_wl.bound_cores = bg_wl.orig_bound_cores
+        for wl in self._all_wls:
+            if wl.is_running:
+                wl.bound_cores = wl.orig_bound_cores
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps

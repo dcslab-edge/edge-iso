@@ -91,11 +91,8 @@ class AffinityIsolator(Isolator):
             logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
 
     def reset(self) -> None:
-        for lc_wl in self._latency_critical_wls:
-            if lc_wl.is_running:
-                lc_wl.bound_cores = lc_wl.orig_bound_cores
-        #if self._latency_critical_wls.is_running:
-        #    self._latency_critical_wls.bound_cores = self._latency_critical_wls.orig_bound_cores
+        for wl in self._all_wls:
+            wl.bound_cores = wl.orig_bound_cores
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps

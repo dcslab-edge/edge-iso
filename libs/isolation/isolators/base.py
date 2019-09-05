@@ -15,13 +15,16 @@ class Isolator(metaclass=ABCMeta):
     _FORCE_THRESHOLD: ClassVar[float] = 0.05
 
     def __init__(self, latency_critical_wls: Set[Workload], best_effort_wls: Set[Workload]) -> None:
-        self._prev_metric_diff: MetricDiff = None
-
         self._latency_critical_wls = latency_critical_wls
         self._best_effort_wls = best_effort_wls
+        self._all_wls = latency_critical_wls | best_effort_wls
         self._perf_target_wl = None
         self._alloc_target_wl = None
         self._dealloc_target_wl = None
+
+        self._prev_metric_diff: Dict[Workload, Optional[MetricDiff]] = dict()
+        for wl in self._all_wls:
+            self._prev_metric_diff[wl] = None
 
         # FIXME: All FGs, BGs can have different NextStep (Currently, All WLs are homogeneous)
         self._lc_wl_next_steps: Dict[Workload, NextStep] = dict()
@@ -33,13 +36,16 @@ class Isolator(metaclass=ABCMeta):
         for k in self._be_wl_next_steps.keys():
             self._be_wl_next_steps[k] = NextStep.IDLE
 
-        self._is_first_decision: bool = True
+        self._is_first_decision: Dict[Workload, bool] = dict()
+        for wl in self._all_wls:
+            self._is_first_decision[wl] = True
+
         self._cur_dominant_resource_cont: ResourceType = None
 
         self._stored_config: Optional[Any] = None
 
     def __del__(self):
-        if len(self._latency_critical_wls) == 0:
+        if len(self._latency_critical_wls) == 0 or len(self._all_wls) is 1:
             self.reset()
 
     @property
@@ -198,20 +204,21 @@ class Isolator(metaclass=ABCMeta):
         isolation is performed at a time
         :return:
         """
+        target_wl = self._perf_target_wl
 
-        if self._perf_target_wl is None:
+        if target_wl is None:
             return NextStep.IDLE
 
-        curr_metric_diff = self._perf_target_wl.calc_metric_diff()
+        curr_metric_diff = target_wl.calc_metric_diff()
 
-        if self._is_first_decision:
-            self._is_first_decision = False
+        if self._is_first_decision[target_wl]:
+            self._is_first_decision[target_wl] = False
             next_step = self._first_decision(curr_metric_diff)
 
         else:
-            next_step = self._monitoring_result(self._prev_metric_diff, curr_metric_diff)
+            next_step = self._monitoring_result(self._prev_metric_diff[target_wl], curr_metric_diff)
 
-        self._prev_metric_diff = curr_metric_diff
+        self._prev_metric_diff[target_wl] = curr_metric_diff
 
         return next_step
 

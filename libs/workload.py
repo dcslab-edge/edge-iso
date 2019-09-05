@@ -7,6 +7,7 @@ from pathlib import Path
 
 import psutil
 import subprocess
+import logging
 
 from .metric_container.basic_metric import BasicMetric, MetricDiff
 from .solorun_data.datas import data_map
@@ -53,6 +54,8 @@ class Workload:
         self._orig_bound_mems: Set[int] = self._cgroup_cpuset.read_mems()
         self._excess_cpu_flag = False   # flag indicating unused cpu cores exist
         self._diff_slack = 0            # slack for expressing diverse SLOs (by controlling resource contention diff)
+        self._need_profiling: bool = True
+        self._profile_metrics: Deque[BasicMetric] = deque()
 
     def __repr__(self) -> str:
         return f'{self._name} (pid: {self._pid})'
@@ -182,6 +185,30 @@ class Workload:
     @property
     def calc_metrics(self) -> Dict[str, Any]:
         return self._calc_metrics
+
+    @property
+    def need_profiling(self) -> bool:
+        return self._need_profiling
+
+    @need_profiling.setter
+    def need_profiling(self, new_value) -> None:
+        self._need_profiling = new_value
+
+    @property
+    def profile_metrics(self) -> Deque[BasicMetric]:
+        return self._profile_metrics
+
+    def collect_metrics(self) -> None:
+        dst_metric_queue: Deque[BasicMetric] = self._profile_metrics
+        src_metric_queue: Deque[BasicMetric] = self._metrics
+        logger = logging.info(f'moving metrics from {src_metric_queue} to {dst_metric_queue}')
+        while src_metric_queue:
+            try:
+                item = src_metric_queue.pop()
+                dst_metric_queue.appendleft(item)
+            except IndexError:
+                logger.debug(f'{src_metric_queue} is Empty!, len: {len(src_metric_queue)}')
+                break
 
     def update_calc_metrics(self) -> None:
         # TODO: cur_metric can be extended to maintain various resource contention for workloads

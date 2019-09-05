@@ -56,6 +56,8 @@ class IsolationPolicy(metaclass=ABCMeta):
         self._all_be_cores = set()
         self.update_allocated_cores()   # Update allocated cores after initialization
         self._excess_cpu_wls = set()
+        self._profile_target_wls = list()    # Workloads need to be profiled
+        self._curr_profile_target: Optional[Workload] = None
 
     def __hash__(self) -> int:
         return id(self)
@@ -161,6 +163,10 @@ class IsolationPolicy(metaclass=ABCMeta):
         cls._available_cores = new_values
 
     @property
+    def curr_profile_target(self) -> Workload:
+        return self._curr_profile_target
+
+    @property
     def ended(self) -> bool:
         """
         This returns true when all latency-critical workloads are ended
@@ -215,19 +221,27 @@ class IsolationPolicy(metaclass=ABCMeta):
     def in_solorun_profiling(self) -> bool:
         return self._in_solorun_profiling_stage
 
-    def start_solorun_profiling(self, target_wl: Workload) -> None:
+    def start_solorun_profiling(self) -> None:
         #print("solorun starting")
         """ profile solorun status of a latency-critical workload """
         if self._in_solorun_profiling_stage:
             raise ValueError('Stop the ongoing solorun profiling first!')
 
+        # FIXME: Hard-coded Assumption: there is at least one LC_WL app. in the group
+        target_wl = self._profile_target_wls[0]
+        #target_wl = self._curr_profile_target
+
         self._in_solorun_profiling_stage = True
         self._cached_lc_num_threads[target_wl] = target_wl.number_of_threads
         self._solorun_verify_violation_count[target_wl] = 0
 
-        # suspend all workloads and their perf agents
-        for be_wl in self._be_wls:
-            be_wl.pause()
+        # suspend all other workloads and their perf agents
+        # All BE workloads are suspended and all LC workloads, which do not have profile data, are profiled.
+        #for be_wl in self._be_wls:
+        #    be_wl.pause()
+        for wl in self._all_wls:
+            if wl is not target_wl:
+                wl.pause()
 
         # clear currently collected metric values of target_lc_wl
         target_wl.metrics.clear()
@@ -237,58 +251,114 @@ class IsolationPolicy(metaclass=ABCMeta):
             isolator.store_cur_config()
             isolator.reset()
 
-    def stop_solorun_profiling(self, target_wl: Workload) -> None:
+    def stop_solorun_profiling(self) -> None:
         #print("solorun stopping")
         if not self._in_solorun_profiling_stage:
             raise ValueError('Start solorun profiling first!')
 
         logger = logging.getLogger(__name__)
-        logger.debug(f'number of collected solorun data: {len(target_wl.metrics)}')
-        self._lc_wls.remove(target_wl)
-        target_wl.avg_solorun_data = BasicMetric.calc_avg(target_wl.metrics, len(target_wl.metrics))
-        logger.debug(f'calculated average solorun data: {self._lc_wls.avg_solorun_data}')
 
-        logger.debug('Enforcing restored configuration...')
+        # calculate average solo-run data
+        for wl in self._profile_target_wls:
+            logger.debug(f'number of collected solorun data: {len(wl.metrics)}')
+            wl.collect_metrics()
+            wl._avg_solorun_data = BasicMetric.calc_avg(wl.profile_metrics, len(wl.profile_metrics))
+            logger.debug(f'calculated average solorun data: {wl.avg_solorun_data}')
+            wl.metrics.clear()  # clear metrics
+
+        logger.debug('Restoring configuration...')
         # restore stored configuration
         for isolator in self._isolator_map.values():
             isolator.load_cur_config()
             isolator.enforce()
-        #print(self._fg_wl.metrics)
-        target_wl.metrics.clear()
-        self._lc_wls.add(target_wl)
 
-        for be_wl in self._be_wls:
-            be_wl.resume()
+        for wl in self._all_wls:
+            wl.resume()
 
         self._in_solorun_profiling_stage = False
 
-    def profile_needed(self, target_wl: Workload) -> bool:
+    def set_next_solorun_target(self) -> None:
+        logger = logging.getLogger(__name__)
+        next_wl_idx = -1
+
+        for idx, wl in enumerate(self._profile_target_wls):
+            if wl is self._curr_profile_target:
+                curr_wl_idx = idx
+                next_wl_idx = (curr_wl_idx + 1) % len(self._profile_target_wls)
+        try:
+            self._curr_profile_target = self._profile_target_wls[next_wl_idx]
+        except IndexError or ValueError:
+            logger.info(f" there is no profilie_target : {self._curr_profile_target}, next_wl_idx: {next_wl_idx}")
+            self._curr_profile_target = None
+
+    def switching_profile_target(self) -> None:
+
+        # Step1. Suspend currently running LC workload which is profiled
+        curr_wl = self.curr_profile_target
+        curr_wl.pause()
+        curr_wl.collect_metrics()   # Move items from `metrics` queue to `profile_metric` queue
+        curr_wl.metrics.clear()     # Clear collected metrics during the solo-run stage
+
+        # Step2. Choose the next LC workload (Round Robin) & Resume
+        self.set_next_solorun_target()
+        next_wl = self._curr_profile_target
+        # init value for `next_wl`
+        self._cached_lc_num_threads[next_wl] = next_wl.number_of_threads
+        self._solorun_verify_violation_count[next_wl] = 0
+
+        next_wl.resume()
+
+        # Step3. Reset some values (e.g., curr_profile_target) to ready for the next profiling
+        # Deal with reset function!
+        #
+
+    def check_profile_target(self, switching_interval: float) -> float:
+        # check profile target workloads
+        profile_target_wls = list()
+        for lc_wl in self._lc_wls:
+            if lc_wl.need_profiling:
+                profile_target_wls.append(lc_wl)
+
+        self._profile_target_wls = profile_target_wls
+        total_profile_time = float(len(self._profile_target_wls) * switching_interval)
+        # ex) 3 * 2.0 = 6.0
+        return total_profile_time
+
+    def profile_needed(self) -> bool:
         """
         This function checks if the profiling procedure should be called
         :return: Decision whether to initiate online solorun profiling
         """
         logger = logging.getLogger(__name__)
 
-        #if self._lc_wls.avg_solorun_data is None:
-        if target_wl.avg_solorun_data is None:
-            logger.debug('initialize solorun data')
+        ret = None
+        for lc_wl in self._lc_wls:
+            # There is no avg solorun data
+            if lc_wl.avg_solorun_data is None:
+                logger.debug(f'initialize solorun data of {lc_wl.name}-{lc_wl.pid}')
+                lc_wl.need_profiling = True
+                ret = True
+
+            # There is detected anomaly in `metric diff`
+            if not lc_wl.calc_metric_diff().verify():
+                self._solorun_verify_violation_count[lc_wl] += 1
+                if self._solorun_verify_violation_count[lc_wl] == self._VERIFY_THRESHOLD:
+                    logger.debug(f'fail to verify solorun data. {{{lc_wl.calc_metric_diff()}}}')
+                    lc_wl.need_profiling = True
+                    ret = True
+
+            # When the number of threads are changed (`avg_solorun_data` needs to be updated)
+            cur_num_threads = lc_wl.number_of_threads
+            if cur_num_threads is not 0 and self._cached_lc_num_threads[lc_wl] != cur_num_threads:
+                logger.debug(f'number of threads. cached: {self._cached_lc_num_threads[lc_wl]}, '
+                             f'current : {cur_num_threads}')
+                lc_wl.need_profiling = True
+                ret = True
+
+        if ret is True:
             return True
-
-        if not target_wl.calc_metric_diff().verify():
-
-            self._solorun_verify_violation_count[target_wl] += 1
-
-            if self._solorun_verify_violation_count[target_wl] == self._VERIFY_THRESHOLD:
-                logger.debug(f'fail to verify solorun data. {{{target_wl.calc_metric_diff()}}}')
-                return True
-
-        cur_num_threads = target_wl.number_of_threads
-        if cur_num_threads is not 0 and self._cached_lc_num_threads[target_wl] != cur_num_threads:
-            logger.debug(f'number of threads. cached: {self._cached_lc_num_threads[target_wl]}, '
-                         f'current : {cur_num_threads}')
-            return True
-
-        return False
+        else:
+            return False
 
     """
     # Swapper related

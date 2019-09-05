@@ -35,6 +35,9 @@ class Controller:
         self._solorun_interval: float = 2.0  # the FG's solorun profiling interval (sec)
         self._solorun_count: Dict[IsolationPolicy, Optional[int]] = dict()
 
+        self._switching_interval: float = 1.0   # FIXME: hard-coded
+        self._total_profile_time: Optional[float] = None
+
         self._isolation_groups: Dict[IsolationPolicy, int] = dict()
 
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
@@ -62,21 +65,54 @@ class Controller:
 
                 #print(group.profile_needed())
                 if group.in_solorun_profiling:
-                    if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
-                        logger.info('Stopping solorun profiling...')
-
-                        group.stop_solorun_profiling()
-                        del self._solorun_count[group]
+                    # Stop condition
+                    #if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
+                    # if iteration_num - self._solorun_count[group] >= int(self._total_profile_time / self._interval):
+                    #     logger.info('Try to choose a solorun profiling target...')
+                    #     group.set_next_solorun_target()
+                    #
+                    #     if group.curr_profile_target is None:
+                    #         logger.info('There is no solorun target leftover')
+                    #         logger.info('Finished profiling and stopping solorun profiling...')
+                    #         group.stop_solorun_profiling()
+                    #         del self._solorun_count[group]
+                    #     elif group.curr_profile_target is not None:
+                    #         logger.info(f'The chosen profiling target is '
+                    #                     f'{group.curr_profile_target.name}-{group.curr_profile_target.pid}')
+                    #         group.switching_profile_target()
+                    #
+                    #     logger.info('skipping isolation... because corun data isn\'t collected yet')
+                    # Not stop condition 1 (Not all LC tasks are profiled)
+                    # FIXME: Below code needs Testing! (duration / timing of switching)
+                    if (iteration_num - self._solorun_count[group]) \
+                            % int(self._switching_interval / self._interval) == 0:
+                        logger.info('Try to choose a solorun profiling target...')
+                        group.set_next_solorun_target()
+                        if group.curr_profile_target is not None:
+                            logger.info(f'The chosen profiling target is '
+                                        f'{group.curr_profile_target.name}-{group.curr_profile_target.pid}')
+                            group.switching_profile_target()
+                        elif group.curr_profile_target is None:
+                            logger.info('There is no solorun target leftover...')
+                            logger.info('Finished profiling and stopping solorun profiling...')
+                            group.stop_solorun_profiling()
+                            del self._solorun_count[group]
 
                         logger.info('skipping isolation... because corun data isn\'t collected yet')
+                    # Not stop condition 2 (Ongoing profile stage)
                     else:
-                        logger.info('skipping isolation because of solorun profiling...')
+                        logger.info(f'skipping isolation because of solorun profiling for'
+                                    f' {group.curr_profile_target}...')
 
                     continue
 
                 # TODO: first expression can lead low reactivity
                 elif iteration_num % int(self._profile_interval / self._interval) == 0 and group.profile_needed():
                     logger.info('Starting solorun profiling...')
+
+                    # check and choose workloads to be profiled
+                    # and also set the interval for invoking switching_profile_target
+                    self._total_profile_time = group.check_profile_target(self._switching_interval)
                     group.start_solorun_profiling()
                     self._solorun_count[group] = iteration_num
                     group.set_idle_isolator()

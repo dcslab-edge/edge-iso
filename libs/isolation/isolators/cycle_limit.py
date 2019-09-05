@@ -69,8 +69,9 @@ class CycleLimitIsolator(Isolator):
         self.dealloc_target_wl = None
 
     def reset(self) -> None:
-        for be_wl in self._best_effort_wls:
-            Cpu.limit_cycle_percentage(be_wl.group_name, Cpu.MAX_PERCENT)
+        for wl in self._all_wls:
+            Cpu.limit_cycle_percentage(wl.group_name, Cpu.MAX_PERCENT)
+
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps
