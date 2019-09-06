@@ -32,7 +32,7 @@ class AffinityIsolator(Isolator):
             # FIXME: hard-coded part (core range)
             self._all_cores = tuple(range(0, 8, 1))
             self._MIN_CORES = 1
-        self._available_cores: Optional[Tuple[int]] = IsolationPolicy.available_cores()
+        self._available_cores: Optional[Tuple[int]] = Isolator.available_cores()
         self._chosen_alloc: Optional[int] = None
         self._chosen_dealloc: Optional[int] = None
         self._cur_alloc: Optional[Tuple[int]] = None
@@ -116,7 +116,7 @@ class AffinityIsolator(Isolator):
             self._chosen_dealloc = None
 
     def get_available_cores(self) -> None:
-        self._available_cores = IsolationPolicy.available_cores
+        self._available_cores = Isolator.available_cores
 
     def set_available_cores(self) -> None:
-        IsolationPolicy.set_available_cores(self._available_cores)
+        Isolator.set_available_cores(self._available_cores)

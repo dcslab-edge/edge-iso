@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Optional, Set, Dict
+from typing import Any, ClassVar, Optional, Set, Dict, Tuple
 
 from .. import NextStep
 from .. import ResourceType
@@ -13,6 +13,7 @@ from ...workload import Workload
 class Isolator(metaclass=ABCMeta):
     _DOD_THRESHOLD: ClassVar[float] = 0.005
     _FORCE_THRESHOLD: ClassVar[float] = 0.05
+    _available_cores: Optional[Tuple[int]] = None
 
     def __init__(self, latency_critical_wls: Set[Workload], best_effort_wls: Set[Workload]) -> None:
         self._latency_critical_wls = latency_critical_wls
@@ -21,6 +22,12 @@ class Isolator(metaclass=ABCMeta):
         self._perf_target_wl = None
         self._alloc_target_wl = None
         self._dealloc_target_wl = None
+
+        # FIXME: hard-coded for Jetson TX2 case
+        self._all_cores = tuple([0, 3, 4, 5])
+        self._all_lc_cores = None
+        self._all_be_cores = None
+        self.update_allocated_cores()
 
         self._prev_metric_diff: Dict[Workload, Optional[MetricDiff]] = dict()
         for wl in self._all_wls:
@@ -244,3 +251,30 @@ class Isolator(metaclass=ABCMeta):
         """Load the current configuration"""
         if self._stored_config is None:
             raise ValueError('Store configuration first!')
+
+    @classmethod
+    def available_cores(cls) -> Tuple[int]:
+        return cls._available_cores
+
+    @classmethod
+    def set_available_cores(cls, new_values) -> None:
+        cls._available_cores = new_values
+
+    def update_allocated_cores(self):
+        logger = logging.getLogger(__name__)
+
+        all_lc_cores = set()
+        all_be_cores = set()
+
+        for be_wl in self._best_effort_wls:
+            be_cores: Set[int] = be_wl.cgroup_cpuset.read_cpus()
+            all_be_cores |= be_cores
+
+        for lc_wl in self._latency_critical_wls:
+            lc_cores: Set[int] = lc_wl.cgroup_cpuset.read_cpus()
+            all_lc_cores |= lc_cores
+
+        self._all_lc_cores = all_lc_cores
+        self._all_be_cores = all_be_cores
+        available_cores = tuple(set(self._all_cores) - set(self._all_lc_cores) - set(self._all_be_cores))
+        Isolator.set_available_cores(available_cores)

@@ -44,12 +44,12 @@ class EdgePolicy(IsolationPolicy):
 
         # if there are available free cores in the node, ...
         # FIXME: hard coded `max_cpu_cores`
-        cpu_core_set: Set[int] = {0, 3, 4, 5}
+        #cpu_core_set: Set[int] = {0, 3, 4, 5}
 
-        self.update_allocated_cores()
-        all_allocated_cores: Set[int] = self.all_lc_cores | self.all_be_cores
+        free_cores_set = self.update_allocated_cores()
+        #all_allocated_cores: Set[int] = self.all_lc_cores | self.all_be_cores
 
-        free_cores_set = cpu_core_set - all_allocated_cores
+        #free_cores_set = cpu_core_set - all_allocated_cores
         logger.info(f'[choose_next_isolator] free_cores_set: {free_cores_set}')
         self.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=True)
 

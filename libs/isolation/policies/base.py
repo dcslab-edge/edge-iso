@@ -17,7 +17,7 @@ from ...utils.machine_type import MachineChecker, NodeType
 class IsolationPolicy(metaclass=ABCMeta):
     _IDLE_ISOLATOR: ClassVar[IdleIsolator] = IdleIsolator()
     _VERIFY_THRESHOLD: ClassVar[int] = 3
-    _available_cores: Optional[Tuple[int]] = None
+    #_available_cores: Optional[Tuple[int]] = None
 
     def __init__(self, lc_wls: Set[Workload], be_wls: Set[Workload]) -> None:
         self._lc_wls = lc_wls
@@ -51,7 +51,6 @@ class IsolationPolicy(metaclass=ABCMeta):
         for lc_wl in self._lc_wls:
             self._cached_lc_num_threads[lc_wl] = lc_wl.number_of_threads
         self._solorun_verify_violation_count: Dict[Workload, int] = dict()
-        #self._available_cores: Optional[Tuple[int]] = None
         self._all_lc_cores = set()
         self._all_be_cores = set()
         self.update_allocated_cores()   # Update allocated cores after initialization
@@ -154,13 +153,13 @@ class IsolationPolicy(metaclass=ABCMeta):
     def all_be_cores(self) -> Set[int]:
         return self._all_be_cores
 
-    @classmethod
-    def available_cores(cls) -> Tuple[int]:
-        return cls._available_cores
-
-    @classmethod
-    def set_available_cores(cls, new_values) -> None:
-        cls._available_cores = new_values
+    # @classmethod
+    # def available_cores(cls) -> Tuple[int]:
+    #     return cls._available_cores
+    #
+    # @classmethod
+    # def set_available_cores(cls, new_values) -> None:
+    #     cls._available_cores = new_values
 
     @property
     def curr_profile_target(self) -> Workload:
@@ -427,7 +426,8 @@ class IsolationPolicy(metaclass=ABCMeta):
         self._all_lc_cores = all_lc_cores
         self._all_be_cores = all_be_cores
         available_cores = tuple(set(self._all_cores) - set(self._all_lc_cores) - set(self._all_be_cores))
-        IsolationPolicy.set_available_cores(available_cores)
+        return available_cores
+        #IsolationPolicy.set_available_cores(available_cores)
 
     def update_excess_cpus_wls(self):
         for lc_wl in self._lc_wls:

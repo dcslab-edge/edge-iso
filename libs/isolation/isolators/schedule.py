@@ -170,10 +170,10 @@ class SchedIsolator(Isolator):
         self._stored_config = None
 
     def get_available_cores(self) -> None:
-        self._available_cores = IsolationPolicy.available_cores
+        self._available_cores = Isolator.available_cores
 
     def set_available_cores(self) -> None:
-        IsolationPolicy.set_available_cores(self._available_cores)
+        Isolator.set_available_cores(self._available_cores)
 
     # def update_workload_res_info(self) -> None:
     #     for lc_wl in self._latency_critical_wls:
