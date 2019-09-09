@@ -17,7 +17,7 @@ class EdgeWViolationPolicy(EdgePolicy):
     def __init__(self, fg_wls: Set[Workload], be_wls: Set[Workload]) -> None:
         super().__init__(fg_wls, be_wls)
         # TODO: Get alloc_target_wl
-        self._alloc_target_wl = self.cur_isolator.alloc_target_wl
+        # self._perf_target_wl = self.cur_isolator.perf_target_wl
 
         self._violation_count: int = 0
 
@@ -26,7 +26,7 @@ class EdgeWViolationPolicy(EdgePolicy):
         if isinstance(self._cur_isolator, AffinityIsolator):
             return False
 
-        resource: ResourceType = self.contentious_resource(self._alloc_target_wl)
+        resource: ResourceType = self.contentious_resource(self._perf_target_wl)
         logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
         return \
                 resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \

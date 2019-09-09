@@ -4,7 +4,7 @@ import logging
 import random
 from typing import Optional, Set, Dict, Tuple
 
-from ..policies.base import IsolationPolicy
+#from ..policies.base import IsolationPolicy
 
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
@@ -50,29 +50,41 @@ class AffinityIsolator(Isolator):
         self.get_available_cores()
         if len(self._available_cores) > 0:
             self._chosen_alloc = random.choice(self._available_cores)
+            self._cur_alloc = tuple(self._cur_steps[wl]+tuple(self._chosen_alloc))
         else:
             self._chosen_alloc = None
-        self._cur_alloc = tuple(self._cur_steps[wl]+tuple(self._chosen_alloc))
+            self._cur_alloc = None
         return self
 
     @property
     def is_max_level(self) -> bool:
         # Check available cores and excess cpu flag (either one on both conditions should be met)
+        logger = logging.getLogger(__name__)
+        logger.info(f'[is_max_level] self.alloc_target_wl: {self.alloc_target_wl}')
+
+        if self.alloc_target_wl is None:
+            return False
         self.get_available_cores()
         return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True
 
     @property
     def is_min_level(self) -> bool:
-        return len(self.dealloc_target_wl.bound_cores) - 1 < self._MIN_CORES
+        logger = logging.getLogger(__name__)
+        logger.info(f'[is_min_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        if self.dealloc_target_wl is None:
+            return False
+        else:
+            return len(self.dealloc_target_wl.bound_cores) - 1 < self._MIN_CORES
 
     def weaken(self) -> 'AffinityIsolator':
         # TODO: This function (randomly) deallocates cores from workload.
         wl = self.perf_target_wl
         if len(wl.bound_cores) > 1:
             self._chosen_dealloc = random.choice(wl.bound_cores)
+            self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
         else:
             self._chosen_dealloc = None
-        self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
+            self._cur_dealloc = None
         return self
 
     def enforce(self) -> None:
@@ -92,7 +104,8 @@ class AffinityIsolator(Isolator):
 
     def reset(self) -> None:
         for wl in self._all_wls:
-            wl.bound_cores = wl.orig_bound_cores
+            if wl.is_running:
+                wl.bound_cores = wl.orig_bound_cores
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps
@@ -106,17 +119,17 @@ class AffinityIsolator(Isolator):
     def _update_other_values(self, action: str) -> None:
         if action is "alloc":
             self._available_cores = tuple(filter(lambda x: x is not self._chosen_alloc, self._available_cores))
-            self.set_available_cores()
+            self.update_available_cores()
             self._cur_alloc = None
             self._chosen_alloc = None
         elif action is "dealloc":
             self._available_cores = tuple(self._available_cores + self._chosen_dealloc)
-            self.set_available_cores()
+            self.update_available_cores()
             self._cur_dealloc = None
             self._chosen_dealloc = None
 
     def get_available_cores(self) -> None:
-        self._available_cores = Isolator.available_cores
+        self._available_cores = Isolator.available_cores()
 
-    def set_available_cores(self) -> None:
+    def update_available_cores(self) -> None:
         Isolator.set_available_cores(self._available_cores)

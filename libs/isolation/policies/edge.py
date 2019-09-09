@@ -51,8 +51,9 @@ class EdgePolicy(IsolationPolicy):
 
         #free_cores_set = cpu_core_set - all_allocated_cores
         logger.info(f'[choose_next_isolator] free_cores_set: {free_cores_set}')
-        self.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=True)
-
+        self.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=False) # Pick a workload of low IPS
+        self._cur_isolator.perf_target_wl.diff_slack = 0.2
+        self._cur_isolator.perf_target_wl = self._perf_target_wl
         # TODO: Affinity Isolator should work properly when WEAKEN and STRENGTHEN.
         # WEAKEN: When free CPUs exist
         # STRENGTHEN: When workloads having excess CPUs exist
@@ -73,9 +74,9 @@ class EdgePolicy(IsolationPolicy):
         # lc_wl = self.most_contentious_workload()
 
         # Choose Isolator (Based on resource type)
-        self.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=False) # Pick a workload of low IPS
-        self._perf_target_wl.diff_slack = 0.2
-        self._cur_isolator.perf_target_wl = self._perf_target_wl
+        #self.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=False) # Pick a workload of low IPS
+        #self._perf_target_wl.diff_slack = 0.2
+        #self._cur_isolator.perf_target_wl = self._perf_target_wl
         for resource, diff_value in self.contentious_resources(self._perf_target_wl):
             if resource is ResourceType.CACHE:
                 isolator = self._isolator_map[CycleLimitIsolator]
@@ -108,10 +109,16 @@ class EdgePolicy(IsolationPolicy):
             # Choose Workload Target (based on resource type & isolator)
             self.choose_isolation_target(resource)
 
+            logger.info(f'[contentious_resources_loop] diff_value: {diff_value}')
+            logger.info(f'[contentious_resources_loop] isolator.is_max_level: {isolator.is_max_level}')
+            logger.info(f'[contentious_resources_loop] isolator.is_min_level: {isolator.is_min_level}')
+
             if diff_value < 0 and not isolator.is_max_level or \
                     diff_value > 0 and not isolator.is_min_level:
                 self._cur_isolator = isolator
                 self._cur_isolator.cur_dominant_resource_cont = resource
+                self._cur_isolator.perf_target_wl = self._perf_target_wl
+
                 # TODO: Testing which dealloc function works properly
                 #self._cur_isolator.dealloc_target_wl = self.choose_workload_for_dealloc_v1()
                 #dealloc_target_wl = self.choose_workload_for_dealloc_v2(resource)
@@ -127,6 +134,7 @@ class EdgePolicy(IsolationPolicy):
         return False
 
     # Matching res_type and sort_criteria
+    # FIXME: The below function may be relocated to policy/base.py to be provided for making other policy
     def choose_isolation_target(self, res_type: ResourceType) -> None:
         logger = logging.getLogger(__name__)
         # sort_metric[0] : strengthen criteria, sort_metric[1] : weaken criteria
@@ -139,13 +147,18 @@ class EdgePolicy(IsolationPolicy):
         elif res_type is ResourceType.MEMORY:
             sort_metric = ["mem_bw", "mem_bw_diff"] # FIXME: NEED TESTING
         else:
-            logger.info(f"Unknown resource type: {res_type}, sort_criteria is determined to instr_diff")
+            logger.info(f"[choose_isolation_target] Unknown resource type: {res_type}, sort_criteria is determined to instr_diff")
 
         if self._cur_isolator is not AffinityIsolator:
             pick_order = [True, False]
         elif self._cur_isolator is AffinityIsolator:
             pick_order = [False, True]
 
+        logger.debug(f'[choose_isolation_target] res_type: {res_type}')
+        logger.debug(f'[choose_isolation_target] pick_order: {pick_order}')
+        logger.debug(f'[choose_isolation_target] sort_metric: {sort_metric}')
+        # FIXME: In this code, there is an assumption that two workloads are always selected.
+        # FIXME: How about two workloads? -> deciding the direction of `strengthen` and `weaken`
         self.choosing_wl_for(objective="strengthen",
                              sort_criteria=sort_metric[0],
                              highest=pick_order[0])
@@ -153,7 +166,7 @@ class EdgePolicy(IsolationPolicy):
                              sort_criteria=sort_metric[1],
                              highest=pick_order[1])
 
-        logger.debug(f"self._cur_isolator: {self._cur_isolator}")
-        logger.debug(f"alloc_target_wl: {self._cur_isolator.alloc_target_wl}")
-        logger.debug(f"dealloc_target_wl: {self._cur_isolator.dealloc_target_wl}")
-        logger.debug(f"perf_target_wl: {self._cur_isolator.perf_target_wl}")
+        logger.debug(f"[choose_isolation_target] self._cur_isolator: {self._cur_isolator}")
+        logger.debug(f"[choose_isolation_target] alloc_target_wl: {self._cur_isolator.alloc_target_wl}")
+        logger.debug(f"[choose_isolation_target] dealloc_target_wl: {self._cur_isolator.dealloc_target_wl}")
+        logger.debug(f"[choose_isolation_target] perf_target_wl: {self._cur_isolator.perf_target_wl}")

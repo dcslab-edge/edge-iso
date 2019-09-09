@@ -220,6 +220,9 @@ class Workload:
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         curr_metric: BasicMetric = self._metrics[0]
+        print(f'curr_metric: {curr_metric}')
+        print(f'self._metric: {self._metrics}')
+        print(f'self._avg_solorun_data: {self._avg_solorun_data}')
         return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
     def all_child_tid(self) -> Tuple[int, ...]:

@@ -55,6 +55,9 @@ class Isolator(metaclass=ABCMeta):
         if len(self._latency_critical_wls) == 0 or len(self._all_wls) is 1:
             self.reset()
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}'
+
     @property
     def perf_target_wl(self) -> Workload:
         return self._perf_target_wl
@@ -129,7 +132,18 @@ class Isolator(metaclass=ABCMeta):
         Declare to stop the configuration search for the current isolator.
         Must be called when the current isolator yields the initiative.
         """
-        self._is_first_decision = True
+        logger = logging.getLogger(__name__)
+
+        if self._perf_target_wl is not None:
+            target_wl = self._perf_target_wl
+        else:
+            target_wl = None
+        logger.debug(f'[yield_isolation] target_wl: {target_wl}')
+        logger.debug(f'[yield_isolation] self._is_first_decision: {self._is_first_decision}')
+        if self._perf_target_wl is not None:
+            self._is_first_decision[target_wl] = True
+
+        #logger.debug(f'self._is_first_decision: {self._is_first_decision}')
 
     def _first_decision(self, cur_metric_diff: MetricDiff) -> NextStep:
         # FIXME: first decision for latency-critical workloads
@@ -211,13 +225,15 @@ class Isolator(metaclass=ABCMeta):
         isolation is performed at a time
         :return:
         """
+        logger = logging.getLogger(__name__)
         target_wl = self._perf_target_wl
 
         if target_wl is None:
             return NextStep.IDLE
 
         curr_metric_diff = target_wl.calc_metric_diff()
-
+        logger.debug(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
+        logger.debug(f'[decide_next_step] target_wl: {target_wl}')
         if self._is_first_decision[target_wl]:
             self._is_first_decision[target_wl] = False
             next_step = self._first_decision(curr_metric_diff)

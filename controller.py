@@ -55,7 +55,7 @@ class Controller:
 
         for group, iteration_num in self._isolation_groups.items():
             logger.info('')
-            logger.info(f'***************isolation of {group.name} #{iteration_num}***************')
+            logger.info(f'***************isolation of {group.name} #{iteration_num} ({group.cur_isolator})***************')
             #print(group.in_solorun_profiling)
             try:
                 #print("============val debug=============")
@@ -88,6 +88,10 @@ class Controller:
                             % int(self._switching_interval / self._interval) == 0:
                         logger.info('Try to choose a solorun profiling target...')
                         group.set_next_solorun_target()
+
+                        # FIXME: This assumes all profile target workloads have the same profile time
+                        if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
+                            group._curr_profile_target = None
                         if group.curr_profile_target is not None:
                             logger.info(f'The chosen profiling target is '
                                         f'{group.curr_profile_target.name}-{group.curr_profile_target.pid}')
@@ -112,7 +116,7 @@ class Controller:
 
                     # check and choose workloads to be profiled
                     # and also set the interval for invoking switching_profile_target
-                    self._total_profile_time = group.check_profile_target(self._switching_interval)
+                    self._total_profile_time = group.check_profile_target(self._profile_interval)
                     group.start_solorun_profiling()
                     self._solorun_count[group] = iteration_num
                     group.set_idle_isolator()

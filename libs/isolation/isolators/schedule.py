@@ -4,7 +4,7 @@ import logging
 import random
 from typing import Optional, Set, Dict, Tuple, Iterable, ClassVar, Any
 
-from ..policies.base import IsolationPolicy
+#from ..policies.base import IsolationPolicy
 
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
@@ -49,7 +49,7 @@ class SchedIsolator(Isolator):
         self._cur_alloc: Optional[Tuple[int]] = None
         self._cur_dealloc: Optional[Tuple[int]] = None
 
-        self._available_cores: Optional[Tuple[int]] = IsolationPolicy.available_cores
+        self._available_cores: Optional[Tuple[int]] = Isolator.available_cores
         self._allocated_cores: Optional[Tuple[int]] = None
         for step in self._cur_steps.values():
             self._allocated_cores += step
@@ -77,12 +77,12 @@ class SchedIsolator(Isolator):
             logger.info(f"self.dealloc_target_wl : {wl}")
             self._chosen_dealloc = random.choice(wl.bound_cores)
             logger.info(f"self._chosen_dealloc : {wl}")
+            self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
         elif wl is None:
             logger.info(f"There is no dealloc_target_wl. (No workload)")
             logger.info(f"self.dealloc_target_wl : {wl}")
             self._chosen_dealloc = None
-        self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc,
-                                         wl.bound_cores))
+            self._cur_dealloc = None
         return self
 
     def weaken(self) -> 'SchedIsolator':
@@ -115,14 +115,19 @@ class SchedIsolator(Isolator):
     @property
     def is_max_level(self) -> bool:
         # At least, a process needs one core for its execution - strengthen condition 1 (in `self._choosing_wl_for()`)
-        logger = logging.getLogger(__name__)
         # FIXME: hard-coded CPUSET.STEP (e.g., 1)
-        return len(self.dealloc_target_wl.bound_cores) - 1 < self._MIN_CORES
+        logger = logging.getLogger(__name__)
+        logger.info(f'[is_max_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        if self.dealloc_target_wl is None:
+            return False
+        else:
+            return len(self.dealloc_target_wl.bound_cores) - 1 < self._MIN_CORES
 
     @property
     def is_min_level(self) -> bool:
         # At least, available core has one core - weaken condition 1 (in `self._choosing_wl_for()`)
         logger = logging.getLogger(__name__)
+        logger.info(f'[is_min_level] self.alloc_target_wl: {self.alloc_target_wl}')
         # FIXME: self._available_cores is valid in the following code segment?
         self.get_available_cores()
         return len(self._available_cores) <= 0
@@ -170,9 +175,9 @@ class SchedIsolator(Isolator):
         self._stored_config = None
 
     def get_available_cores(self) -> None:
-        self._available_cores = Isolator.available_cores
+        self._available_cores = Isolator.available_cores()
 
-    def set_available_cores(self) -> None:
+    def update_available_cores(self) -> None:
         Isolator.set_available_cores(self._available_cores)
 
     # def update_workload_res_info(self) -> None:
@@ -287,11 +292,11 @@ class SchedIsolator(Isolator):
     def _update_other_values(self, action: str) -> None:
         if action is "alloc":
             self._available_cores = tuple(filter(lambda x: x is not self._chosen_alloc, self._available_cores))
-            self.set_available_cores()
+            self.update_available_cores()
             self._cur_alloc = None
             self._chosen_alloc = None
         elif action is "dealloc":
             self._available_cores = tuple(self._available_cores + self._chosen_dealloc)
-            self.set_available_cores()
+            self.update_available_cores()
             self._cur_dealloc = None
             self._chosen_dealloc = None

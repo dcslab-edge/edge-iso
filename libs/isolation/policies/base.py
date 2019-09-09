@@ -15,11 +15,12 @@ from ...utils.machine_type import MachineChecker, NodeType
 
 
 class IsolationPolicy(metaclass=ABCMeta):
-    _IDLE_ISOLATOR: ClassVar[IdleIsolator] = IdleIsolator()
+    #_IDLE_ISOLATOR: ClassVar[IdleIsolator] = IdleIsolator()
     _VERIFY_THRESHOLD: ClassVar[int] = 3
     #_available_cores: Optional[Tuple[int]] = None
 
     def __init__(self, lc_wls: Set[Workload], be_wls: Set[Workload]) -> None:
+        self._IDLE_ISOLATOR: IdleIsolator = IdleIsolator(lc_wls, be_wls)
         self._lc_wls = lc_wls
         self._be_wls = be_wls
         self._all_wls = lc_wls | be_wls
@@ -42,9 +43,13 @@ class IsolationPolicy(metaclass=ABCMeta):
                 (GPUFreqThrottleIsolator, GPUFreqThrottleIsolator(self._lc_wls, self._be_wls)),
                 (SchedIsolator, SchedIsolator(self._lc_wls, self._be_wls))
             ))
-        self._cur_isolator: Isolator = IsolationPolicy._IDLE_ISOLATOR   # isolator init
+        self._cur_isolator: Isolator = self._IDLE_ISOLATOR   # isolator init
         # TODO: cur_metric can be extended to maintain various resource contention for workloads
         self._cur_metrics: Dict[str, Dict[Workload, Any]] = dict()      # workload metric init
+        # FIXME: metrics is hard-coded
+        metrics = ['mem_bw', 'mem_bw_diff', 'llc_hr_diff', 'instr_diff']
+        for metric in metrics:
+            self._cur_metrics[metric] = dict()
 
         self._in_solorun_profiling_stage: bool = False
         self._cached_lc_num_threads: Dict[Workload, int] = dict()
@@ -168,10 +173,12 @@ class IsolationPolicy(metaclass=ABCMeta):
     @property
     def ended(self) -> bool:
         """
-        This returns true when all latency-critical workloads are ended
+        This returns true when either all latency-critical workloads or best-effort ones are ended
         It also checks which workloads are alive
         This function triggers re-allocation of released resources from terminated workloads
         """
+        logger = logging.getLogger(__name__)
+
         be_ended: bool = True
         lc_ended: bool = True
         new_be_wls: Set[Workload] = set()
@@ -189,6 +196,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 new_lc_wls.add(wl)
         self._lc_wls = new_lc_wls
 
+        logger.debug(f'lc_ended: {lc_ended}, be_ended: {be_ended}')
         return lc_ended or be_ended
         #
         # if not self._fg_wl.is_running:
@@ -203,11 +211,18 @@ class IsolationPolicy(metaclass=ABCMeta):
 
     @property
     def name(self) -> str:
-        return f'{self._lc_wls.name}({self._lc_wls.pid})'
+        logger = logging.getLogger(__name__)
+        logger.debug(f'IdleIslator: {isinstance(self.cur_isolator, IdleIsolator)}')
+        if not isinstance(self.cur_isolator, IdleIsolator):
+            #logger.debug(f'[name] self.cur_isolator: {self.cur_isolator}')
+            #logger.debug(f'[name] self.cur_isolator.perf_target_wl: {self.cur_isolator.perf_target_wl}')
+            return f'{self.cur_isolator.perf_target_wl.name}({self.cur_isolator.perf_target_wl.pid})'
+        elif isinstance(self.cur_isolator, IdleIsolator):
+            return f'None (IdleIsolator)'
 
     def set_idle_isolator(self) -> None:
         self._cur_isolator.yield_isolation()
-        self._cur_isolator = IsolationPolicy._IDLE_ISOLATOR
+        self._cur_isolator = self._IDLE_ISOLATOR
 
     def reset(self) -> None:
         for isolator in self._isolator_map.values():
@@ -259,8 +274,8 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         # calculate average solo-run data
         for wl in self._profile_target_wls:
-            logger.debug(f'number of collected solorun data: {len(wl.metrics)}')
             wl.collect_metrics()
+            logger.debug(f'number of collected solorun data: {len(wl.profile_metrics)}')
             wl._avg_solorun_data = BasicMetric.calc_avg(wl.profile_metrics, len(wl.profile_metrics))
             logger.debug(f'calculated average solorun data: {wl.avg_solorun_data}')
             wl.metrics.clear()  # clear metrics
@@ -311,7 +326,8 @@ class IsolationPolicy(metaclass=ABCMeta):
         # Deal with reset function!
         #
 
-    def check_profile_target(self, switching_interval: float) -> float:
+    def check_profile_target(self, profile_interval: float) -> float:
+        logger = logging.getLogger(__name__)
         # check profile target workloads
         profile_target_wls = list()
         for lc_wl in self._lc_wls:
@@ -319,7 +335,10 @@ class IsolationPolicy(metaclass=ABCMeta):
                 profile_target_wls.append(lc_wl)
 
         self._profile_target_wls = profile_target_wls
-        total_profile_time = float(len(self._profile_target_wls) * switching_interval)
+
+        total_profile_time = float(len(self._profile_target_wls) * profile_interval)
+        logger.info(f'profile_target_wls: {profile_target_wls}, len: {len(profile_target_wls)}')
+        logger.info(f'total_profile_time: {total_profile_time}')
         # ex) 3 * 2.0 = 6.0
         return total_profile_time
 
@@ -339,7 +358,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 ret = True
 
             # There is detected anomaly in `metric diff`
-            if not lc_wl.calc_metric_diff().verify():
+            if lc_wl.avg_solorun_data is not None and not lc_wl.calc_metric_diff().verify():
                 self._solorun_verify_violation_count[lc_wl] += 1
                 if self._solorun_verify_violation_count[lc_wl] == self._VERIFY_THRESHOLD:
                     logger.debug(f'fail to verify solorun data. {{{lc_wl.calc_metric_diff()}}}')
@@ -388,7 +407,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 not_empty_metrics += 1
             else:
                 logger.info(f'return False')
-            return False
+                return False
         if not_empty_metrics == len(self._lc_wls):
             logger.info(f'return True')
             return True
@@ -439,7 +458,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         ret = set()
         for lc_wl in self._lc_wls:
             if lc_wl.excess_cpu_flag is True:
-                ret |= lc_wl
+                ret.add(lc_wl)
         # Update excess_cpu_wls
         self._excess_cpu_wls = ret
         if len(self._excess_cpu_wls) > 0:
@@ -450,10 +469,13 @@ class IsolationPolicy(metaclass=ABCMeta):
     # for choosing a workload to monitoring performance (sorting & choosing)
 
     def update_all_workloads_res_info(self) -> None:
+        logger = logging.getLogger(__name__)
+        # FIXME: metrics is hard-coded
         metrics = ['mem_bw', 'mem_bw_diff', 'llc_hr_diff', 'instr_diff']
         for wl in self._all_wls:
             wl.update_calc_metrics()
             for metric in metrics:
+                #logger.info(f'{wl.calc_metrics}')
                 self._cur_metrics[metric][wl] = wl.calc_metrics[metric]
 
     def choosing_wl_for(self, objective: str, sort_criteria: str, highest: bool) -> None:
@@ -467,7 +489,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         # TODO: This function only choose a workload of the highest memory diff
         # FIXME: This function should override the `self._alloc_target_wl` & `self._dealloc_target_wl`
         logger = logging.getLogger(__name__)
-        if self._cur_isolator is AffinityIsolator:
+        if isinstance(self._cur_isolator, AffinityIsolator) or objective is "victim":
             # Affinity isolator performs isolation on `self._perf_target_wl`
             excluded: Iterable = ()
         else:
@@ -483,42 +505,59 @@ class IsolationPolicy(metaclass=ABCMeta):
         idx = 0
 
         if wls_info is None:
-            logger.info(f"There is no any workloads to sort!")
+            logger.info("[choosing_wl_for] There is no any workloads to sort!")
             self._cur_isolator.alloc_target_wl = None
             self._cur_isolator.dealloc_target_wl = None
             self._cur_isolator.perf_target_wl = None
+            self._perf_target_wl = None
             return
 
         # Choosing a workload which has the highest (or the lowest) values for a given metric
         candidate = tuple(filter(lambda x: x[0] not in excluded, wls_info))
         num_candidates = len(candidate)
-        while not chosen and idx < num_candidates-1:
-            candidate = tuple(filter(lambda x: x[0] not in excluded, wls_info))
+        logger.debug(f'[choosing_wl_for] 1st candidate: {candidate}, before loop')
+        logger.debug(f'[choosing_wl_for] num_candidates: {num_candidates}, before loop')
+        while not chosen and idx < num_candidates:
+            #candidate = tuple(filter(lambda x: x[0] not in excluded, wls_info))
+            logger.debug(f'[choosing_wl_for] idx: {idx}, candidate: {candidate}')
             cur_target_wl: Workload = candidate[idx][0]   # idx is the ordinal position from the very first one
+            logger.debug(f'[choosing_wl_for] idx: {idx}, num_candidates: {num_candidates}, candidate: {candidate}, [{cur_target_wl.wl_type}] cur_target_wl: {cur_target_wl} in loop')
+            logger.debug(f'[choosing_wl_for] idx: {idx}, num_candidates: {num_candidates}, {excluded} in loop')
             # cur_memory_bw_diff is criteria for choosing a deallocable candidate for weakening
             # cur_memory_bw is criteria for choosing an allocable candidate for strengthening
             if objective is "victim":
-                self._cur_isolator.perf_target_wl = cur_target_wl
-                chosen = True
-                continue
+                logger.debug(f"[choosing_wl_for] 000000000 : {cur_target_wl.wl_type}")
+                if cur_target_wl.wl_type == "LC":
+                    self._cur_isolator.perf_target_wl = cur_target_wl
+                    self._perf_target_wl = cur_target_wl
+                    chosen = True
+                    logger.debug("[choosing_wl_for] 11111")
+                elif cur_target_wl.wl_type == "BE":
+                    excluded += (cur_target_wl, )
+                    logger.debug("[choosing_wl_for] 22222")
+                #idx += 1
+                #continue
 
             if self._cur_isolator is not AffinityIsolator:
+                logger.debug("[choosing_wl_for] 0000000001111111")
                 if objective is "strengthen":
                     if not self._cur_isolator.is_max_level:
                         self._cur_isolator.dealloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
-                        excluded += cur_target_wl
+                        excluded += (cur_target_wl, )
                 elif objective is "weaken":
                     if not self._cur_isolator.is_min_level:
                         self._cur_isolator.alloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
-                        excluded += cur_target_wl
+                        excluded += (cur_target_wl, )
+
             elif self._cur_isolator is AffinityIsolator:
                 # Setting cur_target_wl as `perf_target_wl`
+                logger.debug("[choosing_wl_for] 00000000022222222")
                 cur_target_wl = self._cur_isolator.perf_target_wl
                 if objective is "strengthen":
                     if not self._cur_isolator.is_max_level:
@@ -526,29 +565,34 @@ class IsolationPolicy(metaclass=ABCMeta):
                         chosen = True
                         continue
                     else:
-                        excluded += cur_target_wl
+                        excluded += (cur_target_wl, )
                 elif objective is "weaken":
                     if not self._cur_isolator.is_min_level:
                         self._cur_isolator.dealloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
-                        excluded += cur_target_wl
+                        excluded += (cur_target_wl, )
+            logger.debug("[choosing_wl_for] 33333")
             idx += 1
+            logger.debug(f"[choosing_wl_for] 44444 chosen: {chosen}, idx: {idx}, num_candidates: {num_candidates}")
+
+        logger.debug("[choosing_wl_for] 55555555")
 
         # If it is not chosen, initialize all other variables
         if not chosen:
-            logger.info(f"There is no chosen workload for {objective}, "
+            logger.debug(f"[choosing_wl_for] There is no chosen workload for {objective}, "
                         f"objective:{objective}, chosen: {chosen}")
             if objective is "strengthen" or "weaken":
                 self._cur_isolator.alloc_target_wl = None
                 self._cur_isolator.dealloc_target_wl = None
             if objective is "victim":
                 self._cur_isolator.perf_target_wl = None
+                self._perf_target_wl = None
 
-        logger.info(f"Chosen Workloads for {self._cur_isolator}")
-        logger.info(f"for perf_target: {self._cur_isolator.perf_target_wl},"
-                    f"for alloc: {self._cur_isolator.alloc_target_wl},"
+        logger.debug(f"[choosing_wl_for] Chosen Workloads for {self._cur_isolator}")
+        logger.debug(f"[choosing_wl_for] for perf_target: {self._cur_isolator.perf_target_wl}, "
+                    f"for alloc: {self._cur_isolator.alloc_target_wl}, "
                     f"for dealloc: {self._cur_isolator.dealloc_target_wl}")
 
     #
