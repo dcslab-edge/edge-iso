@@ -168,7 +168,7 @@ class Isolator(metaclass=ABCMeta):
 
     def _monitoring_result(self, prev_metric_diff: MetricDiff, cur_metric_diff: MetricDiff) -> NextStep:
         # FIXME: monitoring_result for latency-critical workloads
-
+        logger = logging.getLogger(__name__)
         curr_diff = self._get_metric_type_from(cur_metric_diff)
         prev_diff = self._get_metric_type_from(prev_metric_diff)
         diff_of_diff = curr_diff - prev_diff

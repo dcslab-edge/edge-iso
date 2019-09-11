@@ -199,9 +199,10 @@ class Workload:
         return self._profile_metrics
 
     def collect_metrics(self) -> None:
+        logger = logging.getLogger(__name__)
         dst_metric_queue: Deque[BasicMetric] = self._profile_metrics
         src_metric_queue: Deque[BasicMetric] = self._metrics
-        logger = logging.info(f'moving metrics from {src_metric_queue} to {dst_metric_queue}')
+        logger.debug(f'moving metrics from {src_metric_queue} to {dst_metric_queue}')
         while src_metric_queue:
             try:
                 item = src_metric_queue.pop()
@@ -219,10 +220,11 @@ class Workload:
         self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
+        logger = logging.getLogger(__name__)
         curr_metric: BasicMetric = self._metrics[0]
-        print(f'curr_metric: {curr_metric}')
-        print(f'self._metric: {self._metrics}')
-        print(f'self._avg_solorun_data: {self._avg_solorun_data}')
+        logger.debug(f'curr_metric: {curr_metric}')
+        logger.debug(f'self._metric: {self._metrics}')
+        logger.debug(f'self._avg_solorun_data: {self._avg_solorun_data}')
         return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
     def all_child_tid(self) -> Tuple[int, ...]:

@@ -26,12 +26,22 @@ class EdgeWViolationPolicy(EdgePolicy):
         if isinstance(self._cur_isolator, AffinityIsolator):
             return False
 
-        resource: ResourceType = self.contentious_resource(self._perf_target_wl)
-        logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
-        return \
-                resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
-                or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
-                                                            or isinstance(self._cur_isolator, CycleLimitIsolator))
+        resources = self.contentious_resources(self._perf_target_wl)
+        for resource, diff_value in resources:
+            logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
+            if resource is not ResourceType.CPU:
+                ret = resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+                      or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
+                                                                  or isinstance(self._cur_isolator, CycleLimitIsolator))
+                logger.info(f'[_check_violation] ret: {ret}')
+                return ret
+        #logger.info(f'[_check_violation] ret: {ret}')
+        #return ret
+
+        # return \
+        #         resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+        #         or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
+        #                                                     or isinstance(self._cur_isolator, CycleLimitIsolator))
 
         """
         if self._node_type == NodeType.IntegratedGPU and self.foreground_workload.is_gpu_task == 0:

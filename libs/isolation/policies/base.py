@@ -25,7 +25,9 @@ class IsolationPolicy(metaclass=ABCMeta):
         self._be_wls = be_wls
         self._all_wls = lc_wls | be_wls
 
-        self._perf_target_wl = None  # selected workload to for alloc/dealloc)
+        self._perf_target_wl = None  # selected workload to for `victim`
+        self._alloc_target_wl = None  # selected workload to for `alloc`
+        self._dealloc_target_wl = None  # selected workload to for `dealloc`
 
         self._node_type = MachineChecker.get_node_type()
         # TODO: Discrete GPU case
@@ -503,13 +505,16 @@ class IsolationPolicy(metaclass=ABCMeta):
         wls_info = tuple(sorted(self._cur_metrics[sort_criteria].items(), key=lambda x: x[1], reverse=highest))
         chosen = False
         idx = 0
-
+        logger.debug(f'[choosing_wl_for] wls_info: {wls_info}')
+        logger.debug(f'[choosing_wl_for] self._cur_metrics[{sort_criteria}]: {self._cur_metrics[sort_criteria]}')
         if wls_info is None:
-            logger.info("[choosing_wl_for] There is no any workloads to sort!")
+            logger.debug("[choosing_wl_for] There is no any workloads to sort!")
             self._cur_isolator.alloc_target_wl = None
             self._cur_isolator.dealloc_target_wl = None
             self._cur_isolator.perf_target_wl = None
-            self._perf_target_wl = None
+            self._perf_target_wl = self._cur_isolator.perf_target_wl
+            self._alloc_target_wl = self._cur_isolator.alloc_target_wl
+            self._dealloc_target_wl = self._cur_isolator.dealloc_target_wl
             return
 
         # Choosing a workload which has the highest (or the lowest) values for a given metric
@@ -543,6 +548,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 if objective is "strengthen":
                     if not self._cur_isolator.is_max_level:
                         self._cur_isolator.dealloc_target_wl = cur_target_wl
+                        self._dealloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
@@ -550,6 +556,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 elif objective is "weaken":
                     if not self._cur_isolator.is_min_level:
                         self._cur_isolator.alloc_target_wl = cur_target_wl
+                        self._alloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
@@ -562,6 +569,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 if objective is "strengthen":
                     if not self._cur_isolator.is_max_level:
                         self._cur_isolator.alloc_target_wl = cur_target_wl
+                        self._alloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
@@ -569,6 +577,7 @@ class IsolationPolicy(metaclass=ABCMeta):
                 elif objective is "weaken":
                     if not self._cur_isolator.is_min_level:
                         self._cur_isolator.dealloc_target_wl = cur_target_wl
+                        self._dealloc_target_wl = cur_target_wl
                         chosen = True
                         continue
                     else:
@@ -586,14 +595,16 @@ class IsolationPolicy(metaclass=ABCMeta):
             if objective is "strengthen" or "weaken":
                 self._cur_isolator.alloc_target_wl = None
                 self._cur_isolator.dealloc_target_wl = None
+                self._alloc_target_wl = self._cur_isolator.alloc_target_wl
+                self._dealloc_target_wl = self._cur_isolator.dealloc_target_wl
             if objective is "victim":
                 self._cur_isolator.perf_target_wl = None
-                self._perf_target_wl = None
+                self._perf_target_wl = self._cur_isolator.perf_target_wl
 
         logger.debug(f"[choosing_wl_for] Chosen Workloads for {self._cur_isolator}")
-        logger.debug(f"[choosing_wl_for] for perf_target: {self._cur_isolator.perf_target_wl}, "
-                    f"for alloc: {self._cur_isolator.alloc_target_wl}, "
-                    f"for dealloc: {self._cur_isolator.dealloc_target_wl}")
+        logger.debug(f"[choosing_wl_for] for perf_target: {self._cur_isolator.perf_target_wl},"
+                     f"for alloc: {self._cur_isolator.alloc_target_wl}, "
+                     f"for dealloc: {self._cur_isolator.dealloc_target_wl}")
 
     #
     # @staticmethod

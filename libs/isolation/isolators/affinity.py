@@ -50,7 +50,7 @@ class AffinityIsolator(Isolator):
         self.get_available_cores()
         if len(self._available_cores) > 0:
             self._chosen_alloc = random.choice(self._available_cores)
-            self._cur_alloc = tuple(self._cur_steps[wl]+tuple(self._chosen_alloc))
+            self._cur_alloc = tuple(self._cur_steps[wl]+(self._chosen_alloc,))
         else:
             self._chosen_alloc = None
             self._cur_alloc = None
@@ -91,12 +91,12 @@ class AffinityIsolator(Isolator):
         logger = logging.getLogger(__name__)
         #logger.info(f'affinity of foreground is {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_step}')
 
-        if self._cur_alloc is not None:
+        if self._cur_alloc is not None and self.alloc_target_wl is not None:
             self.alloc_target_wl.bound_cores = self._cur_alloc
             self._cur_steps[self.alloc_target_wl] = self._cur_alloc
             self._update_other_values("alloc")
             logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
-        elif self._cur_dealloc is not None:
+        elif self._cur_dealloc is not None and self.dealloc_target_wl is not None:
             self.dealloc_target_wl.bound_cores = self._cur_dealloc
             self._cur_steps[self.dealloc_target_wl] = self._cur_dealloc
             self._update_other_values("dealloc")

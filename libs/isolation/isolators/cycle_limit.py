@@ -83,7 +83,6 @@ class CycleLimitIsolator(Isolator):
             if wl.is_running:
                 Cpu.limit_cycle_percentage(wl.group_name, Cpu.MAX_PERCENT)
 
-
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps
 

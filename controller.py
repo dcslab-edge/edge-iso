@@ -86,33 +86,33 @@ class Controller:
                     # FIXME: Below code needs Testing! (duration / timing of switching)
                     if (iteration_num - self._solorun_count[group]) \
                             % int(self._switching_interval / self._interval) == 0:
-                        logger.info('Try to choose a solorun profiling target...')
+                        logger.info('[_isolate_workloads] Try to choose a solorun profiling target...')
                         group.set_next_solorun_target()
 
                         # FIXME: This assumes all profile target workloads have the same profile time
                         if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
                             group._curr_profile_target = None
                         if group.curr_profile_target is not None:
-                            logger.info(f'The chosen profiling target is '
+                            logger.info(f'[_isolate_workloads] The chosen profiling target is '
                                         f'{group.curr_profile_target.name}-{group.curr_profile_target.pid}')
                             group.switching_profile_target()
                         elif group.curr_profile_target is None:
-                            logger.info('There is no solorun target leftover...')
-                            logger.info('Finished profiling and stopping solorun profiling...')
+                            logger.info('[_isolate_workloads] There is no solorun target leftover...')
+                            logger.info('[_isolate_workloads] Finished profiling and stopping solorun profiling...')
                             group.stop_solorun_profiling()
                             del self._solorun_count[group]
 
-                        logger.info('skipping isolation... because corun data isn\'t collected yet')
+                        logger.info('[_isolate_workloads] skipping isolation... because corun data isn\'t collected yet')
                     # Not stop condition 2 (Ongoing profile stage)
                     else:
-                        logger.info(f'skipping isolation because of solorun profiling for'
+                        logger.info(f'[_isolate_workloads] skipping isolation because of solorun profiling for'
                                     f' {group.curr_profile_target}...')
 
                     continue
 
                 # TODO: first expression can lead low reactivity
                 elif iteration_num % int(self._profile_interval / self._interval) == 0 and group.profile_needed():
-                    logger.info('Starting solorun profiling...')
+                    logger.info('[_isolate_workloads] Starting solorun profiling...')
 
                     # check and choose workloads to be profiled
                     # and also set the interval for invoking switching_profile_target
@@ -120,7 +120,7 @@ class Controller:
                     group.start_solorun_profiling()
                     self._solorun_count[group] = iteration_num
                     group.set_idle_isolator()
-                    logger.info('skipping isolation because of solorun profiling...')
+                    logger.info('[_isolate_workloads] skipping isolation because of solorun profiling...')
                     continue
 
                 if group.new_isolator_needed:
@@ -133,7 +133,7 @@ class Controller:
                 # FIXME: decide_next_step belongs to isolator
                 # `calc_metric_diff()` is invoked in the below code to determine `next_step`.
                 decided_next_step: NextStep = cur_isolator.decide_next_step()
-                logger.info(f'Monitoring Result : {decided_next_step.name}')
+                logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
 
                 if decided_next_step is NextStep.STRENGTHEN:
                     cur_isolator.strengthen()
@@ -241,7 +241,7 @@ def main() -> None:
     controller_logger.addHandler(file_handler)
 
     module_logger = logging.getLogger(libs.__name__)
-    module_logger.setLevel(logging.DEBUG)
+    module_logger.setLevel(logging.INFO)
     module_logger.addHandler(stream_handler)
     module_logger.addHandler(file_handler)
 
