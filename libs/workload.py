@@ -202,13 +202,13 @@ class Workload:
         logger = logging.getLogger(__name__)
         dst_metric_queue: Deque[BasicMetric] = self._profile_metrics
         src_metric_queue: Deque[BasicMetric] = self._metrics
-        logger.debug(f'moving metrics from {src_metric_queue} to {dst_metric_queue}')
+        logger.debug(f'[collect_metrics] moving metrics from {src_metric_queue} to {dst_metric_queue}')
         while src_metric_queue:
             try:
                 item = src_metric_queue.pop()
                 dst_metric_queue.appendleft(item)
             except IndexError:
-                logger.debug(f'{src_metric_queue} is Empty!, len: {len(src_metric_queue)}')
+                logger.debug(f'[collect_metrics] {src_metric_queue} is Empty!, len: {len(src_metric_queue)}')
                 break
 
     def update_calc_metrics(self) -> None:
@@ -222,9 +222,9 @@ class Workload:
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         logger = logging.getLogger(__name__)
         curr_metric: BasicMetric = self._metrics[0]
-        logger.debug(f'curr_metric: {curr_metric}')
-        logger.debug(f'self._metric: {self._metrics}')
-        logger.debug(f'self._avg_solorun_data: {self._avg_solorun_data}')
+        logger.debug(f'[calc_metric_diff] curr_metric: {curr_metric}')
+        logger.debug(f'[calc_metric_diff] self._metric: {self._metrics}')
+        logger.debug(f'[calc_metric_diff] self._avg_solorun_data: {self._avg_solorun_data}')
         return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
     def all_child_tid(self) -> Tuple[int, ...]:

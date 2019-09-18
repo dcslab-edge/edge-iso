@@ -123,16 +123,52 @@ class Controller:
                     logger.info('[_isolate_workloads] skipping isolation because of solorun profiling...')
                     continue
 
+                # Select Workloads for isolation
+                # Pick a workload of low IPS
+                group.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=False)
+
+                # Update dominant contention for "victim"
+                group.update_dominant_contention()
+
+                # Choosing isolation target workloads
+                #group.choose_isolation_target()
+                logger.info(f'group._cur_isolator: {group.cur_isolator}')
+                logger.debug(f'group._cur_isolator.perf_target_wl: '
+                             f'{group.cur_isolator.perf_target_wl.name}-{group.cur_isolator.perf_target_wl.pid}')
+                logger.info(f'group._perf_target_wl: {group.perf_target_wl.name}-{group.perf_target_wl.pid}')
+                #logger.info(f'group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
+                #logger.info(f'group._perf_target_wl: {group.dealloc_target_wl.name}-{group.dealloc_target_wl.pid}')
+
                 if group.new_isolator_needed:
                     #print(group)
                     # workloads and isolator are selected in the below code
                     group.choose_next_isolator()
 
                 cur_isolator: Isolator = group.cur_isolator
+                cur_isolator.cur_dominant_resource_cont = group.dom_res_cont
+                group.choose_isolation_target()
+                if group.alloc_target_wl is not None:
+                    logger.info(f'group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
+                else:
+                    logger.info(f'group._alloc_target_wl: None')
 
+                if group.dealloc_target_wl is not None:
+                    logger.info(f'group._dealloc_target_wl: {group.dealloc_target_wl.name}-{group.dealloc_target_wl.pid}')
+                else:
+                    logger.info(f'group._dealloc_target_wl: None')
+
+                #cur_isolator.perf_target_wl = group.perf_target_wl
+
+                #group.choose_isolation_target()
                 # FIXME: decide_next_step belongs to isolator
                 # `calc_metric_diff()` is invoked in the below code to determine `next_step`.
-                decided_next_step: NextStep = cur_isolator.decide_next_step()
+                decided_next_step = cur_isolator.decide_next_step()
+                #decided_next_step = ret[0]
+                #cur_diff = ret[1]
+
+                # compensate the diff values
+                #group.dom_res_diff = cur_diff
+
                 logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
 
                 if decided_next_step is NextStep.STRENGTHEN:
@@ -148,6 +184,7 @@ class Controller:
                     raise NotImplementedError(f'unknown isolation result : {decided_next_step}')
 
                 cur_isolator.enforce()
+                cur_isolator.clear_targets()
 
             except (psutil.NoSuchProcess, subprocess.CalledProcessError, ProcessLookupError):
                 pass

@@ -123,7 +123,7 @@ class AffinityIsolator(Isolator):
             self._cur_alloc = None
             self._chosen_alloc = None
         elif action is "dealloc":
-            self._available_cores = tuple(self._available_cores + self._chosen_dealloc)
+            self._available_cores = tuple(self._available_cores + (self._chosen_dealloc,))
             self.update_available_cores()
             self._cur_dealloc = None
             self._chosen_dealloc = None

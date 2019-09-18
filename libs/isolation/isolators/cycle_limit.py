@@ -26,6 +26,7 @@ class CycleLimitIsolator(Isolator):
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         logger = logging.getLogger(__name__)
+        # FIXME: super().cur_dominant_resource_cont should be synced with self._dom_res_cont of Policy class
         res_cont_type = super().cur_dominant_resource_cont
         logger.info(f'[_get_metric_type_from] res_cont_type: {res_cont_type}')
         if res_cont_type is ResourceType.CACHE:
@@ -75,8 +76,8 @@ class CycleLimitIsolator(Isolator):
         for wl in wls:
             if wl is not None:
                 Cpu.limit_cycle_percentage(wl.group_name, self._cur_steps[wl])
-        self.alloc_target_wl = None
-        self.dealloc_target_wl = None
+        #self.alloc_target_wl = None
+        #self.dealloc_target_wl = None
 
     def reset(self) -> None:
         for wl in self._all_wls:

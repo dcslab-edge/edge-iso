@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABCMeta, abstractmethod
-from typing import Any, ClassVar, Optional, Set, Dict, Tuple
+from typing import Any, ClassVar, Optional, Set, Dict, Tuple, Iterable
 
 from .. import NextStep
 from .. import ResourceType
@@ -173,9 +173,8 @@ class Isolator(metaclass=ABCMeta):
         prev_diff = self._get_metric_type_from(prev_metric_diff)
         diff_of_diff = curr_diff - prev_diff
 
-        logger = logging.getLogger(__name__)
-        logger.debug(f'diff of diff is {diff_of_diff:>7.4f}')
-        logger.debug(f'current diff: {curr_diff:>7.4f}, previous diff: {prev_diff:>7.4f}')
+        logger.info(f'[_monitoring_result] diff of diff is {diff_of_diff:>7.4f}')
+        logger.info(f'[_monitoring_result] current diff: {curr_diff:>7.4f}, previous diff: {prev_diff:>7.4f}')
 
         if abs(diff_of_diff) <= self._DOD_THRESHOLD \
                 or abs(curr_diff) <= self._DOD_THRESHOLD:
@@ -234,6 +233,9 @@ class Isolator(metaclass=ABCMeta):
         curr_metric_diff = target_wl.calc_metric_diff()
         logger.debug(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
         logger.debug(f'[decide_next_step] target_wl: {target_wl}')
+
+        logger.debug(f'[decide_next_step] self.alloc_target_wl: {self.alloc_target_wl}')
+        logger.debug(f'[decide_next_step] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self._is_first_decision[target_wl]:
             self._is_first_decision[target_wl] = False
             next_step = self._first_decision(curr_metric_diff)
@@ -294,3 +296,7 @@ class Isolator(metaclass=ABCMeta):
         self._all_be_cores = all_be_cores
         available_cores = tuple(set(self._all_cores) - set(self._all_lc_cores) - set(self._all_be_cores))
         Isolator.set_available_cores(available_cores)
+
+    def clear_targets(self) -> None:
+        self.alloc_target_wl = None
+        self.dealloc_target_wl = None

@@ -26,15 +26,27 @@ class EdgeWViolationPolicy(EdgePolicy):
         if isinstance(self._cur_isolator, AffinityIsolator):
             return False
 
-        resources = self.contentious_resources(self._perf_target_wl)
-        for resource, diff_value in resources:
-            logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
-            if resource is not ResourceType.CPU:
-                ret = resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
-                      or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
-                                                                  or isinstance(self._cur_isolator, CycleLimitIsolator))
-                logger.info(f'[_check_violation] ret: {ret}')
-                return ret
+        dom_res_cont = self._dom_res_cont
+        logger.info(f'[_check_violation] dominant contentious resource: {dom_res_cont}, '
+                    f'cur_isolator: {self._cur_isolator}')
+        ret = dom_res_cont is ResourceType.CPU and not isinstance(self._cur_isolator, AffinityIsolator) \
+              or dom_res_cont is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+              or dom_res_cont is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
+                                                              or isinstance(self._cur_isolator, CycleLimitIsolator))
+        logger.info(f'[_check_violation] ret: {ret}')
+        return ret
+
+        # resources = self.contentious_resources(self._perf_target_wl)
+        # for resource, diff_value in resources:
+        #     logger.info(f'[_check_violation] contentious resource: {resource}, cur_isolator: {self._cur_isolator}')
+        #     # FIXME: last condition statement can be misleading
+        #     ret = \
+        #         resource is ResourceType.CPU and not isinstance(self._cur_isolator, AffinityIsolator) \
+        #         or resource is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+        #         or resource is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
+        #                                                     or isinstance(self._cur_isolator, CycleLimitIsolator))
+        #     logger.info(f'[_check_violation] ret: {ret}')
+        #     return ret
         #logger.info(f'[_check_violation] ret: {ret}')
         #return ret
 
@@ -58,11 +70,17 @@ class EdgeWViolationPolicy(EdgePolicy):
 
     @property
     def new_isolator_needed(self) -> bool:
+        logger = logging.getLogger(__name__)
         if isinstance(self._cur_isolator, IdleIsolator):
             return True
 
+        if self._dom_res_cont is ResourceType.CPU:
+            logger.info('new isolator is required due to violation')
+            self.set_idle_isolator()
+            self._violation_count = 0
+            return True
+
         if self._check_violation():
-            logger = logging.getLogger(__name__)
             logger.info(f'violation is occurred. current isolator type : {self._cur_isolator.__class__.__name__}')
 
             self._violation_count += 1
