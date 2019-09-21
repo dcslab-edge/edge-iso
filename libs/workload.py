@@ -21,7 +21,8 @@ class Workload:
     Controller schedules the groups of `Workload' instances to enforce their scheduling decisions
     """
 
-    def __init__(self, name: str, wl_type: str, pid: int, perf_pid: int, perf_interval: int) -> None:
+    def __init__(self, name: str, wl_type: str, pid: int, wl_diff_slack: float,
+                 perf_pid: int, perf_interval: int) -> None:
         #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
         self._wl_type = wl_type # BE or LC
@@ -53,7 +54,8 @@ class Workload:
         self._orig_bound_cores: Tuple[int, ...] = tuple(self._cgroup_cpuset.read_cpus())
         self._orig_bound_mems: Set[int] = self._cgroup_cpuset.read_mems()
         self._excess_cpu_flag = False   # flag indicating unused cpu cores exist
-        self._diff_slack = 0            # slack for expressing diverse SLOs (by controlling resource contention diff)
+        self._diff_slack = wl_diff_slack    # slack for expressing diverse SLOs
+                                            # (by controlling resource contention diff)
         self._need_profiling: bool = True
         self._profile_metrics: Deque[BasicMetric] = deque()
 

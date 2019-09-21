@@ -50,8 +50,9 @@ class PollingThread(Thread, metaclass=Singleton):
         if len(arr) != 8:
             return
 
-        wl_identifier, wl_type, pid, perf_pid, perf_interval, tegra_pid, tegra_interval, max_workloads = arr
+        wl_identifier, wl_type, pid, diff_slack, perf_pid, perf_interval, tegra_pid, tegra_interval, max_workloads = arr
         pid = int(pid)
+        wl_diff_slack = float(diff_slack)
         perf_pid = int(perf_pid)
         perf_interval = int(perf_interval)
         item = wl_identifier.split('_')
@@ -61,7 +62,7 @@ class PollingThread(Thread, metaclass=Singleton):
         if not psutil.pid_exists(pid):
             return
 
-        workload = Workload(wl_name, wl_type, pid, perf_pid, perf_interval)
+        workload = Workload(wl_name, wl_type, pid, wl_diff_slack, perf_pid, perf_interval)
         #workload.check_gpu_task()
         if wl_type == 'BE':
             logger.info(f'{workload} is best-effort process')
