@@ -47,7 +47,7 @@ class PollingThread(Thread, metaclass=Singleton):
         logger = logging.getLogger('monitoring.workload_creation')
         logger.debug(f'{arr} is received from workload_creation queue')
 
-        if len(arr) != 8:
+        if len(arr) != 9:
             return
 
         wl_identifier, wl_type, pid, diff_slack, perf_pid, perf_interval, tegra_pid, tegra_interval, max_workloads = arr
