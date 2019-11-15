@@ -6,6 +6,7 @@ from typing import Optional, Set, Dict, Tuple
 
 #from ..policies.base import IsolationPolicy
 
+from .. import ResourceType
 from .base import Isolator
 from ...metric_container.basic_metric import MetricDiff
 from ...workload import Workload
@@ -41,13 +42,22 @@ class AffinityIsolator(Isolator):
         self._stored_config: Optional[Dict[Workload, Tuple[int]]] = None
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
+        #return metric_diff.instruction_ps
         return metric_diff.instruction_ps - metric_diff.diff_slack
+
+    def _get_res_type_from(self) -> ResourceType:
+        return ResourceType.CPU
 
     def strengthen(self) -> 'AffinityIsolator':
         # FIXME: AffinityIsolator should contain each workload's core affinity
         # TODO: This function (randomly) allocates more cores to workload.
+        logger = logging.getLogger(__name__)
+
         wl = self.perf_target_wl
         self.get_available_cores()
+        self.sync_cur_steps()
+        logger.info(f'[strengthen] self._available_cores: {self._available_cores}, self._cur_steps[wl]: {self._cur_steps[wl]}')
+
         if len(self._available_cores) > 0:
             self._chosen_alloc = random.choice(self._available_cores)
             self._cur_alloc = tuple(self._cur_steps[wl]+(self._chosen_alloc,))
@@ -65,6 +75,7 @@ class AffinityIsolator(Isolator):
         if self.alloc_target_wl is None:
             return False
         self.get_available_cores()
+        logger.info(f'[is_max_level] self.available_cores: {self._available_cores}')
         return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True
 
     @property
@@ -79,6 +90,7 @@ class AffinityIsolator(Isolator):
     def weaken(self) -> 'AffinityIsolator':
         # TODO: This function (randomly) deallocates cores from workload.
         wl = self.perf_target_wl
+        self.sync_cur_steps()
         if len(wl.bound_cores) > 1:
             self._chosen_dealloc = random.choice(wl.bound_cores)
             self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
@@ -91,12 +103,15 @@ class AffinityIsolator(Isolator):
         logger = logging.getLogger(__name__)
         #logger.info(f'affinity of foreground is {self._latency_critical_wls.orig_bound_cores[0]}-{self._cur_step}')
 
+        self.sync_cur_steps()
         if self._cur_alloc is not None and self.alloc_target_wl is not None:
+            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
             self.alloc_target_wl.bound_cores = self._cur_alloc
             self._cur_steps[self.alloc_target_wl] = self._cur_alloc
             self._update_other_values("alloc")
             logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
         elif self._cur_dealloc is not None and self.dealloc_target_wl is not None:
+            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
             self.dealloc_target_wl.bound_cores = self._cur_dealloc
             self._cur_steps[self.dealloc_target_wl] = self._cur_dealloc
             self._update_other_values("dealloc")
@@ -129,7 +144,15 @@ class AffinityIsolator(Isolator):
             self._chosen_dealloc = None
 
     def get_available_cores(self) -> None:
+        logger = logging.getLogger(__name__)
+        logger.info(f'[get_availble_cores] Isolator.available_cores(): {Isolator.available_cores()}')
         self._available_cores = Isolator.available_cores()
 
     def update_available_cores(self) -> None:
+        logger = logging.getLogger(__name__)
         Isolator.set_available_cores(self._available_cores)
+
+    def sync_cur_steps(self) -> None:
+        for wl, val in self._cur_steps.items():
+            self._cur_steps[wl] = wl.bound_cores
+

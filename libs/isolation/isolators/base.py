@@ -33,23 +33,25 @@ class Isolator(metaclass=ABCMeta):
         for wl in self._all_wls:
             self._prev_metric_diff[wl] = None
 
-        # FIXME: All FGs, BGs can have different NextStep (Currently, All WLs are homogeneous)
-        self._lc_wl_next_steps: Dict[Workload, NextStep] = dict()
-        self._be_wl_next_steps: Dict[Workload, NextStep] = dict()
-
-        for k in self._lc_wl_next_steps.keys():
-            self._lc_wl_next_steps[k] = NextStep.IDLE
-
-        for k in self._be_wl_next_steps.keys():
-            self._be_wl_next_steps[k] = NextStep.IDLE
+        # # FIXME: All FGs, BGs can have different NextStep (Currently, All WLs are homogeneous)
+        # self._lc_wl_next_steps: Dict[Workload, NextStep] = dict()
+        # self._be_wl_next_steps: Dict[Workload, NextStep] = dict()
+        #
+        # for k in self._lc_wl_next_steps.keys():
+        #     self._lc_wl_next_steps[k] = NextStep.IDLE
+        #
+        # for k in self._be_wl_next_steps.keys():
+        #     self._be_wl_next_steps[k] = NextStep.IDLE
 
         self._is_first_decision: Dict[Workload, bool] = dict()
         for wl in self._all_wls:
             self._is_first_decision[wl] = True
 
         self._cur_dominant_resource_cont: ResourceType = None
+        self._res_diffs = None
 
         self._stored_config: Optional[Any] = None
+        self._violated_counts: int = 0
 
     def __del__(self):
         if len(self._latency_critical_wls) == 0 or len(self._all_wls) is 1:
@@ -81,6 +83,14 @@ class Isolator(metaclass=ABCMeta):
     @dealloc_target_wl.setter
     def dealloc_target_wl(self, new_dealloc_target_wl: Workload) -> None:
         self._dealloc_target_wl = new_dealloc_target_wl
+
+    @property
+    def violated_counts(self) -> int:
+        return self._violated_counts
+
+    @violated_counts.setter
+    def violated_counts(self, new_val) -> None:
+        self._violated_counts = new_val
 
     @abstractmethod
     def strengthen(self) -> 'Isolator':
@@ -127,6 +137,14 @@ class Isolator(metaclass=ABCMeta):
     def cur_dominant_resource_cont(self, resource: ResourceType) -> None:
         self._cur_dominant_resource_cont = resource
 
+    @property
+    def res_diffs(self) -> Iterable:
+        return self._res_diffs
+
+    @res_diffs.setter
+    def res_diffs(self, new_val) -> None:
+        self._res_diffs = new_val
+
     def yield_isolation(self) -> None:
         """
         Declare to stop the configuration search for the current isolator.
@@ -151,7 +169,7 @@ class Isolator(metaclass=ABCMeta):
         curr_diff = self._get_metric_type_from(cur_metric_diff)
 
         logger = logging.getLogger(__name__)
-        logger.debug(f'current diff: {curr_diff:>7.4f}')
+        logger.info(f'[_first_decision] current diff: {curr_diff:>7.4f}')
 
         if curr_diff < 0:
             if self.is_max_level:
@@ -217,6 +235,14 @@ class Isolator(metaclass=ABCMeta):
         return target_lc_wl
     """
 
+    @abstractmethod
+    def _get_res_type_from(self) -> ResourceType:
+        """
+        This function returns the ResourceType for current isolator
+        :return:
+        """
+        pass
+
     def decide_next_step(self) -> NextStep:
         # FIXME: Fix code to work for `multiple` latency-critical workloads
         """
@@ -231,11 +257,11 @@ class Isolator(metaclass=ABCMeta):
             return NextStep.IDLE
 
         curr_metric_diff = target_wl.calc_metric_diff()
-        logger.debug(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
-        logger.debug(f'[decide_next_step] target_wl: {target_wl}')
+        logger.info(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
+        logger.info(f'[decide_next_step] target_wl: {target_wl}')
 
-        logger.debug(f'[decide_next_step] self.alloc_target_wl: {self.alloc_target_wl}')
-        logger.debug(f'[decide_next_step] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        logger.info(f'[decide_next_step] self.alloc_target_wl: {self.alloc_target_wl}')
+        logger.info(f'[decide_next_step] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self._is_first_decision[target_wl]:
             self._is_first_decision[target_wl] = False
             next_step = self._first_decision(curr_metric_diff)

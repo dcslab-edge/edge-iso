@@ -59,7 +59,11 @@ class SchedIsolator(Isolator):
         self._stored_config: Optional[Dict[Workload, Tuple[int]]] = None
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
+        #return metric_diff.local_mem_util_ps
         return metric_diff.local_mem_util_ps - metric_diff.diff_slack
+
+    def _get_res_type_from(self) -> ResourceType:
+        return ResourceType.MEMORY
 
     def strengthen(self) -> 'SchedIsolator':
         """
@@ -72,6 +76,7 @@ class SchedIsolator(Isolator):
         # It selects the workload which is able to deallocable
         #self.choosing_wl_for(strengthen=True, sort_criteria="mem_bw", lowest=True)
         wl = self.dealloc_target_wl
+        self.sync_cur_steps()
         if wl is not None:
             logger.info(f"It can deallocate {wl.name}-{wl.pid}")
             logger.info(f"self.dealloc_target_wl : {wl}")
@@ -99,6 +104,7 @@ class SchedIsolator(Isolator):
         # TODO: Performance Testing with Simple Scenario
         #self.choosing_wl_for(strengthen=False, sort_criteria="mem_bw_diff", lowest=False)
         wl = self.alloc_target_wl
+        self.sync_cur_steps()
         if wl is not None:
             logger.info(f"It can allocate {wl.name}-{wl.pid}")
             logger.info(f"self.alloc_target_wl : {wl}")
@@ -136,6 +142,8 @@ class SchedIsolator(Isolator):
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
         # FIXME: hard coded & Assuming that bg task is placed to CPUs which have higher CPU IDs (e.g., 4,5)
+
+        self.sync_cur_steps()
         if self._cur_alloc is not None and self.alloc_target_wl is not None:
             logger.info(f'affinity of {self.alloc_target_wl.name}-{self.alloc_target_wl.pid} is '
                         f'{self._cur_alloc}')
@@ -306,3 +314,7 @@ class SchedIsolator(Isolator):
             self.update_available_cores()
             self._cur_dealloc = None
             self._chosen_dealloc = None
+
+    def sync_cur_steps(self) -> None:
+        for wl, val in self._cur_steps.items():
+            self._cur_steps[wl] = wl.bound_cores

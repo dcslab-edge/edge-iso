@@ -26,13 +26,22 @@ class CycleLimitIsolator(Isolator):
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
         logger = logging.getLogger(__name__)
-        # FIXME: super().cur_dominant_resource_cont should be synced with self._dom_res_cont of Policy class
+        # FIXME: super().cur_dominant_resource_cont does not reflect the type of isolator
         res_cont_type = super().cur_dominant_resource_cont
         logger.info(f'[_get_metric_type_from] res_cont_type: {res_cont_type}')
         if res_cont_type is ResourceType.CACHE:
+            #return metric_diff.llc_hit_ratio
             return metric_diff.llc_hit_ratio - metric_diff.diff_slack
         elif res_cont_type is ResourceType.MEMORY:
+            #return metric_diff.local_mem_util_ps
             return metric_diff.local_mem_util_ps - metric_diff.diff_slack
+
+    def _get_res_type_from(self) -> ResourceType:
+        # `res_type` is either ResourceType.CACHE or ResourceType.MEMORY
+        res_diffs = super().res_diffs
+        for res_type, _ in res_diffs:
+            if res_type is not ResourceType.CPU:
+                return res_type
 
     def strengthen(self) -> 'CycleLimitIsolator':
         if self.dealloc_target_wl is not None:

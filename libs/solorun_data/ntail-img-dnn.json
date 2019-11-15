@@ -1,0 +1,12 @@
+{
+  "name": "ntail-img-dnn",
+  "runtime": 21.94354486465454,
+  "llc_references": 215051611.68539327,
+  "llc_misses": 45213528.59550562,
+  "instructions": 2031397411.235955,
+  "cycles": 3326132875.168539,
+  "gpu_core_util": 0.6741573033707865,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 29.04494382022472,
+  "gpu_emc_freq": 9330
+}

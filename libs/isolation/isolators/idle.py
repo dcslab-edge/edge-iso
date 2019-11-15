@@ -1,7 +1,7 @@
 # coding: UTF-8
 
 from .base import Isolator
-from .. import NextStep
+from .. import NextStep, ResourceType
 from ...metric_container.basic_metric import MetricDiff
 from ...workload import Workload
 from typing import Set, Dict
@@ -12,6 +12,9 @@ class IdleIsolator(Isolator):
         super().__init__(latency_critical_wls, best_effort_wls)
 
     def _get_metric_type_from(self, metric_diff: MetricDiff) -> float:
+        pass
+
+    def _get_res_type_from(self) -> ResourceType:
         pass
 
     def strengthen(self) -> 'Isolator':

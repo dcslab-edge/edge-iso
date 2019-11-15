@@ -40,9 +40,16 @@ class EdgePolicy(IsolationPolicy):
         elif self._dom_res_cont is ResourceType.CACHE:
             isolator = self._isolator_map[CycleLimitIsolator]
         elif self._dom_res_cont is ResourceType.MEMORY:
-            isolator = self._isolator_map[SchedIsolator]
-            if isolator.is_max_level is True:
-                isolator = self._isolator_map[CycleLimitIsolator]
+            self.perf_target_wl.check_gpu_task()
+            logger.info(f'[choose_next_isolator] self.perf_target_wl: {self.perf_target_wl}, is_gpu_task: {self.perf_target_wl.is_gpu_task}')
+            if self.perf_target_wl.is_gpu_task:
+                isolator = self._isolator_map[GPUFreqThrottleIsolator]
+                if isolator.is_max_level is True:
+                    isolator = self._isolator_map[SchedIsolator]
+            elif not self.perf_target_wl.is_gpu_task:
+                isolator = self._isolator_map[SchedIsolator]
+                if isolator.is_max_level is True:
+                    isolator = self._isolator_map[CycleLimitIsolator]
         else:
             raise NotImplementedError(f'Unknown ResourceType: {self._dom_res_cont}')
 

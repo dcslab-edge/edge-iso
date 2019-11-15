@@ -26,7 +26,7 @@ class Workload:
         #print("+++++++++++++++++++++++=WORKLOAD INITIATED+++++++++++++")
         self._name = name
         self._wl_type = wl_type # BE or LC
-        self._is_gpu_task = 1  # if yes, set to 1, otherwise set to 0.
+        self._is_gpu_task = 0  # if yes, set to 1, otherwise set to 0.
 
         self._pid = pid
         self._metrics: Deque[BasicMetric] = deque()
@@ -216,10 +216,14 @@ class Workload:
     def update_calc_metrics(self) -> None:
         # TODO: cur_metric can be extended to maintain various resource contention for workloads
         curr_metric_diff = self.calc_metric_diff()
+        diff_slack = curr_metric_diff.diff_slack
         self._calc_metrics['mem_bw'] = BasicMetric.calc_avg(self._metrics, 30).llc_miss_ps
-        self._calc_metrics['mem_bw_diff'] = curr_metric_diff.local_mem_util_ps
-        self._calc_metrics['instr_diff'] = curr_metric_diff.instruction_ps
-        self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio
+        # self._calc_metrics['mem_bw_diff'] = curr_metric_diff.local_mem_util_ps
+        # self._calc_metrics['instr_diff'] = curr_metric_diff.instruction_ps
+        # self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio
+        self._calc_metrics['mem_bw_diff'] = curr_metric_diff.local_mem_util_ps - diff_slack
+        self._calc_metrics['instr_diff'] = curr_metric_diff.instruction_ps - diff_slack
+        self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio - diff_slack
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         logger = logging.getLogger(__name__)
@@ -239,18 +243,23 @@ class Workload:
             return tuple()
 
     def check_gpu_task(self) -> None:
+        logger = logging.getLogger(__name__)
         # gpu_mem_path = '/sys/kernel/debug/nvmap/iovmm/clients'
         try:
             lines = subprocess.check_output("sudo cat /sys/kernel/debug/nvmap/iovmm/clients | awk \'{print $3}\'",
                                             shell=True)
-            pids = lines.split().decode().split()
+            pids = lines.split()
+            logger.info(f'[check_gpu_task] pids: {pids}')
             for pid in pids:
-                if pid == str(self.pid):
+                logger.info(f'[check_gpu_task] pid: {pid}, pid.decode(): {pid.decode()}')
+                if pid.decode() == str(self.pid):
                     self._is_gpu_task = 1
                     break
+        except (ValueError, IndexError, AttributeError) as err:
+            logger.info(f'[check_gpu_task] err: {err}')
             self._is_gpu_task = 0
-        except (ValueError, IndexError, AttributeError):
-            self._is_gpu_task = 0
+        finally:
+            logger.info(f'[check_gpu_task] self._is_gpu_task: {self.is_gpu_task}')
 
     """
     def check_gpu_task(self) -> None:

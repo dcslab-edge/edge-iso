@@ -24,15 +24,23 @@ class EdgeWViolationPolicy(EdgePolicy):
     def _check_violation(self) -> bool:
         logger = logging.getLogger(__name__)
         if isinstance(self._cur_isolator, AffinityIsolator):
+            logger.info(f'[_check_violation] ret: False')
             return False
 
         dom_res_cont = self._dom_res_cont
         logger.info(f'[_check_violation] dominant contentious resource: {dom_res_cont}, '
                     f'cur_isolator: {self._cur_isolator}')
+        """
         ret = dom_res_cont is ResourceType.CPU and not isinstance(self._cur_isolator, AffinityIsolator) \
               or dom_res_cont is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
               or dom_res_cont is ResourceType.MEMORY and not (isinstance(self._cur_isolator, SchedIsolator)
                                                               or isinstance(self._cur_isolator, CycleLimitIsolator))
+        logger.info(f'[_check_violation] ret: {ret}')
+        """
+        ret = dom_res_cont is ResourceType.CPU and not isinstance(self._cur_isolator, AffinityIsolator) \
+              or dom_res_cont is ResourceType.CACHE and not isinstance(self._cur_isolator, CycleLimitIsolator) \
+              or dom_res_cont is ResourceType.MEMORY and not (isinstance(self._cur_isolator, GPUFreqThrottleIsolator)
+                                                              or isinstance(self._cur_isolator, SchedIsolator))
         logger.info(f'[_check_violation] ret: {ret}')
         return ret
 
@@ -71,6 +79,7 @@ class EdgeWViolationPolicy(EdgePolicy):
     @property
     def new_isolator_needed(self) -> bool:
         logger = logging.getLogger(__name__)
+        cur_isolator = self.cur_isolator
         if isinstance(self._cur_isolator, IdleIsolator):
             return True
 
@@ -78,17 +87,20 @@ class EdgeWViolationPolicy(EdgePolicy):
             logger.info('new isolator is required due to violation')
             self.set_idle_isolator()
             self._violation_count = 0
+            cur_isolator.violated_counts = 0
             return True
 
         if self._check_violation():
             logger.info(f'violation is occurred. current isolator type : {self._cur_isolator.__class__.__name__}')
 
             self._violation_count += 1
+            cur_isolator.violated_counts += 1
 
             if self._violation_count >= EdgeWViolationPolicy.VIOLATION_THRESHOLD:
                 logger.info('new isolator is required due to violation')
                 self.set_idle_isolator()
                 self._violation_count = 0
+                cur_isolator.violated_counts = 0
                 return True
 
         return False
@@ -96,6 +108,7 @@ class EdgeWViolationPolicy(EdgePolicy):
     def choose_next_isolator(self) -> bool:
         if super().choose_next_isolator():
             self._violation_count = 0
+            self.cur_isolator.violated_counts = 0
             return True
 
         return False

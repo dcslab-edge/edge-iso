@@ -1,0 +1,12 @@
+{
+  "name": "ntail-xapian",
+  "runtime": 21.893150091171265,
+  "llc_references": 80639578.3888889,
+  "llc_misses": 12956759.11111111,
+  "instructions": 1904347657.4444442,
+  "cycles": 2231993256.388889,
+  "gpu_core_util": 0.4444444444444445,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 9.5,
+  "gpu_emc_freq": 9330
+}

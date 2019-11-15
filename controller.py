@@ -44,6 +44,7 @@ class Controller:
 
         self._cpuset = CpuSet('EdgeIso')
         self._binding_cores = binding_cores
+        #self._isolator_changed = False
         #self._cpuset.create_group()
         #self._cpuset.assign_cpus(binding_cores)
 
@@ -53,7 +54,9 @@ class Controller:
     def _isolate_workloads(self) -> None:
         logger = logging.getLogger(__name__)
 
+        #logger.info(f'[_isolate_workloads] before entering for loop, self._isolation_groups: {self._isolation_groups}')
         for group, iteration_num in self._isolation_groups.items():
+            #logger.info(f'[_isolate_workloads] just entering for loop, self._isolation_groups: {self._isolation_groups}')
             logger.info('')
             logger.info(f'***************isolation of {group.name} #{iteration_num} ({group.cur_isolator})***************')
             #print(group.in_solorun_profiling)
@@ -64,6 +67,9 @@ class Controller:
                 #print(int(self._solorun_interval / self._interval))
 
                 #print(group.profile_needed())
+
+                logger.info(f'[_isolate_workloads] int(self._profile_interval/self._interval: {int(self._profile_interval / self._interval)}')
+                #logger.info(f'[_isolate_workloads] group.profile_needed(): {group.profile_needed()}')
                 if group.in_solorun_profiling:
                     # Stop condition
                     #if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
@@ -87,15 +93,21 @@ class Controller:
                     if (iteration_num - self._solorun_count[group]) \
                             % int(self._switching_interval / self._interval) == 0:
                         logger.info('[_isolate_workloads] Try to choose a solorun profiling target...')
-                        group.set_next_solorun_target()
+                        #group.set_next_solorun_target()
 
                         # FIXME: This assumes all profile target workloads have the same profile time
-                        if iteration_num - self._solorun_count[group] >= int(self._solorun_interval / self._interval):
+                        num_profile_targets = len(group.profile_target_wls)
+                        if iteration_num - self._solorun_count[group] >= \
+                                int(self._solorun_interval / self._interval)*len(group.profile_target_wls):
+                            logger.info(f'[_isolate_workloads] Entering, all curr_profile_Target finishes profiling... iteration_num - self._solorun_count[group]: {iteration_num - self._solorun_count[group]}')
+                            logger.info(f'[_isolate_workloads] Entering, all curr_profile_Target finishes profiling... int(self._solorun_interval / self._interval)*num_profile_target: {int(self._solorun_interval / self._interval)*num_profile_targets}')
+                            logger.info(f'[_isolate_workloads] num_profile_targets: {num_profile_targets}')
                             group._curr_profile_target = None
                         if group.curr_profile_target is not None:
+                            logger.info('[_isolate_workloads] Try to choose a solorun profiling target...')
+                            group.switching_profile_target()
                             logger.info(f'[_isolate_workloads] The chosen profiling target is '
                                         f'{group.curr_profile_target.name}-{group.curr_profile_target.pid}')
-                            group.switching_profile_target()
                         elif group.curr_profile_target is None:
                             logger.info('[_isolate_workloads] There is no solorun target leftover...')
                             logger.info('[_isolate_workloads] Finished profiling and stopping solorun profiling...')
@@ -120,15 +132,20 @@ class Controller:
                     group.start_solorun_profiling()
                     self._solorun_count[group] = iteration_num
                     group.set_idle_isolator()
-                    logger.info('[_isolate_workloads] skipping isolation because of solorun profiling...')
+                    logger.info(f'[_isolate_workloads] skipping isolation because of solorun profiling of {group.curr_profile_target}...')
+                    #logger.info(f'[_isolate_workloads] hi 3333, self._total_profile_time: {self._total_profile_time}, self._solorun_count[group]: {self._solorun_count[group]}')
                     continue
 
                 # Select Workloads for isolation
                 # Pick a workload of low IPS
+                #logger.info('[_isolate_workloads] hi 1111')
                 group.choosing_wl_for(objective="victim", sort_criteria="instr_diff", highest=False)
-
+                if group.perf_target_wl is None:
+                    logger.info(f'There is no workload which violates SLO now... (based on IPS_diff)')
+                    group.set_idle_isolator()
+                    continue
                 # Update dominant contention for "victim"
-                group.update_dominant_contention()
+                res_diffs = group.update_dominant_contention()
 
                 # Choosing isolation target workloads
                 #group.choose_isolation_target()
@@ -146,6 +163,8 @@ class Controller:
 
                 cur_isolator: Isolator = group.cur_isolator
                 cur_isolator.cur_dominant_resource_cont = group.dom_res_cont
+                #cur_isolator._res_diffs = res_diffs
+
                 group.choose_isolation_target()
                 if group.alloc_target_wl is not None:
                     logger.info(f'group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
@@ -163,13 +182,28 @@ class Controller:
                 # FIXME: decide_next_step belongs to isolator
                 # `calc_metric_diff()` is invoked in the below code to determine `next_step`.
                 decided_next_step = cur_isolator.decide_next_step()
+                logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
+
+                # group.choose_isolation_target(decided_next_step)
+                # if group.alloc_target_wl is not None:
+                #     logger.info(f'[_isolate_workloads] group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
+                # else:
+                #     logger.info(f'[_isolate_workloads] group._alloc_target_wl: None')
+                #
+                # if group.dealloc_target_wl is not None:
+                #     logger.info(f'[_isolate_workloads] group._dealloc_target_wl: {group.dealloc_target_wl.name}-{group.dealloc_target_wl.pid}')
+                # else:
+                #     logger.info(f'[_isolate_workloads] group._dealloc_target_wl: None')
+
+
+
                 #decided_next_step = ret[0]
                 #cur_diff = ret[1]
 
                 # compensate the diff values
                 #group.dom_res_diff = cur_diff
 
-                logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
+                #logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
 
                 if decided_next_step is NextStep.STRENGTHEN:
                     cur_isolator.strengthen()

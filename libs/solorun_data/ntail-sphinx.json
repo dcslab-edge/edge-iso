@@ -1,0 +1,12 @@
+{
+  "name": "ntail-sphinx",
+  "runtime": 154.11004900932312,
+  "llc_references": 57390618.227848105,
+  "llc_misses": 12993896.772151899,
+  "instructions": 883797410.3164556,
+  "cycles": 2075305422.9746838,
+  "gpu_core_util": 0.28481012658227844,
+  "gpu_core_freq": 6500,
+  "gpu_emc_util": 4.7784810126582276,
+  "gpu_emc_freq": 9330
+}
