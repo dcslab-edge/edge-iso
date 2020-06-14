@@ -30,12 +30,12 @@ class Controller:
     def __init__(self, metric_buf_size: int, binding_cores: Set[int]) -> None:
         self._pending_queue: PendingQueue = PendingQueue(EdgeWViolationPolicy)
 
-        self._interval: float = 0.2  # scheduling interval (sec)
+        self._interval: float = 0.1  # scheduling interval (sec)
         self._profile_interval: float = 1.0  # check interval for phase change (sec)
         self._solorun_interval: float = 2.0  # the FG's solorun profiling interval (sec)
         self._solorun_count: Dict[IsolationPolicy, Optional[int]] = dict()
 
-        self._switching_interval: float = 1.0   # FIXME: hard-coded
+        self._switching_interval: float = 0.4   # FIXME: hard-coded
         self._total_profile_time: Optional[float] = None
 
         self._isolation_groups: Dict[IsolationPolicy, int] = dict()

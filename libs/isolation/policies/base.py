@@ -402,7 +402,7 @@ class IsolationPolicy(metaclass=ABCMeta):
             wl.collect_metrics()
             logger.debug(f'number of collected solorun data: {len(wl.profile_metrics)}')
             wl._avg_solorun_data = BasicMetric.calc_avg(wl.profile_metrics, len(wl.profile_metrics))
-            logger.debug(f'calculated average solorun data: {wl.avg_solorun_data}')
+            logger.info(f'calculated average solorun data: {wl.avg_solorun_data}')
             wl.metrics.clear()  # clear metrics
 
         logger.debug('Restoring configuration...')
@@ -576,10 +576,10 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         self._all_lc_cores = all_lc_cores
         self._all_be_cores = all_be_cores
-        logger.info(f'[update_allocated_cores] self._all_lc_cores: {self._all_lc_cores}')
-        logger.info(f'[update_allocated_cores] self._all_be_cores: {self._all_be_cores}')
+        #logger.info(f'[update_allocated_cores] self._all_lc_cores: {self._all_lc_cores}')
+        #logger.info(f'[update_allocated_cores] self._all_be_cores: {self._all_be_cores}')
         available_cores = tuple(set(self._all_cores) - set(self._all_lc_cores) - set(self._all_be_cores))
-        logger.info(f'[update_allocated_cores] available_cores: {available_cores}')
+        #logger.info(f'[update_allocated_cores] available_cores: {available_cores}')
         return available_cores
         #IsolationPolicy.set_available_cores(available_cores)
 
@@ -593,12 +593,12 @@ class IsolationPolicy(metaclass=ABCMeta):
         self.update_excess_cpus_wls()
         ret = set()
         for lc_wl in self._lc_wls:
-            logger.info(f'[check_excess_cpus_wls] lc_wl.excess_cpu_flag: {lc_wl.excess_cpu_flag}')
+            #logger.info(f'[check_excess_cpus_wls] lc_wl.excess_cpu_flag: {lc_wl.excess_cpu_flag}')
             if lc_wl.excess_cpu_flag is True:
                 ret.add(lc_wl)
         # Update excess_cpu_wls
         self._excess_cpu_wls = ret
-        logger.info(f'[check_excess_cpus_wls] self._excess_cpu_wls: {self._excess_cpu_wls}, len: {len(self._excess_cpu_wls)}')
+        #logger.info(f'[check_excess_cpus_wls] self._excess_cpu_wls: {self._excess_cpu_wls}, len: {len(self._excess_cpu_wls)}')
         if len(self._excess_cpu_wls) > 0:
             return True
         else:

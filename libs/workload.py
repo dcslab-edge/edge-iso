@@ -227,9 +227,9 @@ class Workload:
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         logger = logging.getLogger(__name__)
-        curr_metric: BasicMetric = self._metrics[0]
-        logger.debug(f'[calc_metric_diff] curr_metric: {curr_metric}')
         logger.debug(f'[calc_metric_diff] self._metric: {self._metrics}')
+        curr_metric: BasicMetric = self._metrics[0]
+        logger.debug(f'[calc_metric_diff] curr_metric(self._metrics[0]): {curr_metric}')
         logger.debug(f'[calc_metric_diff] self._avg_solorun_data: {self._avg_solorun_data}')
         return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
@@ -249,14 +249,14 @@ class Workload:
             lines = subprocess.check_output("sudo cat /sys/kernel/debug/nvmap/iovmm/clients | awk \'{print $3}\'",
                                             shell=True)
             pids = lines.split()
-            logger.info(f'[check_gpu_task] pids: {pids}')
+            #logger.info(f'[check_gpu_task] pids: {pids}')
             for pid in pids:
-                logger.info(f'[check_gpu_task] pid: {pid}, pid.decode(): {pid.decode()}')
+                #logger.info(f'[check_gpu_task] pid: {pid}, pid.decode(): {pid.decode()}')
                 if pid.decode() == str(self.pid):
                     self._is_gpu_task = 1
                     break
         except (ValueError, IndexError, AttributeError) as err:
-            logger.info(f'[check_gpu_task] err: {err}')
+            #logger.info(f'[check_gpu_task] err: {err}')
             self._is_gpu_task = 0
         finally:
             logger.info(f'[check_gpu_task] self._is_gpu_task: {self.is_gpu_task}')

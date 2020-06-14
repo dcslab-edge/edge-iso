@@ -12,10 +12,10 @@ from ...utils.machine_type import NodeType
 
 
 class EdgeWViolationPolicy(EdgePolicy):
-    VIOLATION_THRESHOLD: ClassVar[int] = 3
+    VIOLATION_THRESHOLD: ClassVar[int] = 1
 
-    def __init__(self, fg_wls: Set[Workload], be_wls: Set[Workload]) -> None:
-        super().__init__(fg_wls, be_wls)
+    def __init__(self, lc_wls: Set[Workload], be_wls: Set[Workload]) -> None:
+        super().__init__(lc_wls, be_wls)
         # TODO: Get alloc_target_wl
         # self._perf_target_wl = self.cur_isolator.perf_target_wl
 
