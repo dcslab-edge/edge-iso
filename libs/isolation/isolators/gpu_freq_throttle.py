@@ -59,7 +59,7 @@ class GPUFreqThrottleIsolator(Isolator):
         if self.alloc_target_wl is None:
             return False
         else:
-            return CPUDVFS.MAX_IDX < self._cur_steps[self.alloc_target_wl] + GPUDVFS.STEP_IDX
+            return GPUDVFS.MAX_IDX < self._cur_steps[self.alloc_target_wl] + GPUDVFS.STEP_IDX
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)

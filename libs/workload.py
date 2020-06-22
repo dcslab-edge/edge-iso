@@ -11,7 +11,7 @@ import logging
 
 from .metric_container.basic_metric import BasicMetric, MetricDiff
 from .solorun_data.datas import data_map
-from .utils import CPUDVFS, GPUDVFS  # , ResCtrl, numa_topology
+from .utils import CPUDVFS, ResCtrl, numa_topology
 from .utils.cgroup import Cpu, CpuSet
 
 
@@ -38,9 +38,9 @@ class Workload:
 
         self._cgroup_cpuset = CpuSet(self.group_name)
         self._cgroup_cpu = Cpu(self.group_name)
-        #self._resctrl = ResCtrl(self.group_name)
+        self._resctrl = ResCtrl(self.group_name)
         self._cpu_dvfs = CPUDVFS(self.group_name)
-        self._gpu_dvfs = GPUDVFS(self.group_name)
+        #self._gpu_dvfs = GPUDVFS(self.group_name)
 
         # This variable is used to contain the recent avg. status
         self._avg_solorun_data: Optional[BasicMetric] = None
@@ -73,9 +73,9 @@ class Workload:
     def cgroup_cpu(self) -> Cpu:
         return self._cgroup_cpu
 
-    # @property
-    # def resctrl(self) -> ResCtrl:
-    #     return self._resctrl
+    @property
+    def resctrl(self) -> ResCtrl:
+        return self._resctrl
 
     @property
     def is_gpu_task(self) -> int:
@@ -85,9 +85,9 @@ class Workload:
     def cpu_dvfs(self) -> CPUDVFS:
         return self._cpu_dvfs
 
-    @property
-    def gpu_dvfs(self) -> GPUDVFS:
-        return self._gpu_dvfs
+    #@property
+    #def gpu_dvfs(self) -> GPUDVFS:
+    #    return self._gpu_dvfs
 
     @property
     def name(self) -> str:
@@ -217,7 +217,11 @@ class Workload:
         # TODO: cur_metric can be extended to maintain various resource contention for workloads
         curr_metric_diff = self.calc_metric_diff()
         diff_slack = curr_metric_diff.diff_slack
-        self._calc_metrics['mem_bw'] = BasicMetric.calc_avg(self._metrics, 30).llc_miss_ps
+        #if len(self._metrics) < 30:
+        #    self._calc_metrics['mem_bw'] = BasicMetric.calc_avg(self._profile_metrics,
+        #                                                        len(self._profile_metrics)).local_mem_ps
+        #else:
+        self._calc_metrics['mem_bw'] = BasicMetric.calc_avg(self._metrics, 30).local_mem_ps
         # self._calc_metrics['mem_bw_diff'] = curr_metric_diff.local_mem_util_ps
         # self._calc_metrics['instr_diff'] = curr_metric_diff.instruction_ps
         # self._calc_metrics['llc_hr_diff'] = curr_metric_diff.llc_hit_ratio
@@ -227,10 +231,15 @@ class Workload:
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         logger = logging.getLogger(__name__)
-        logger.debug(f'[calc_metric_diff] self._metric: {self._metrics}')
-        curr_metric: BasicMetric = self._metrics[0]
-        logger.debug(f'[calc_metric_diff] curr_metric(self._metrics[0]): {curr_metric}')
-        logger.debug(f'[calc_metric_diff] self._avg_solorun_data: {self._avg_solorun_data}')
+        logger.info(f'[calc_metric_diff] wl: {self.name}, self._metric: {self._metrics}')
+        try:
+            curr_metric: BasicMetric = self._metrics[0]
+            logger.debug(f'[calc_metric_diff] curr_metric(self._metrics[0]): {curr_metric}')
+            logger.debug(f'[calc_metric_diff] self._avg_solorun_data: {self._avg_solorun_data}')
+        except IndexError:
+            # FIXME: If there is no corun data samples, then use `profile_metrics'.
+            logger.debug(f'[calc_metric_diff] {self.name} has no data in self._metrics')
+            curr_metric = self._profile_metrics[0]
         return MetricDiff(curr_metric, self._avg_solorun_data, core_norm, self.diff_slack)
 
     def all_child_tid(self) -> Tuple[int, ...]:
@@ -277,7 +286,6 @@ class Workload:
             self._is_gpu_task = 0
     """
 
-    """
     def cur_socket_id(self) -> int:
         sockets = frozenset(numa_topology.core_to_node[core_id] for core_id in self.bound_cores)
     
@@ -286,7 +294,7 @@ class Workload:
             raise NotImplementedError(f'Workload spans multiple sockets. {sockets}')
         else:
             return next(iter(sockets))
-    """
+
     def pause(self) -> None:
         self._proc_info.suspend()
         self._perf_info.suspend()

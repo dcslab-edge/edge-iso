@@ -1,4 +1,5 @@
 # coding: UTF-8
+# NOTE: DEPRECATED
 
 import logging
 from typing import ClassVar, Optional, Tuple

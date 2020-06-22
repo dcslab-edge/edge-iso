@@ -3,7 +3,7 @@
 
 from .affinity import AffinityIsolator
 from .base import Isolator
-#from .cache import CacheIsolator
+from .cache import CacheIsolator
 #from .core import CoreIsolator
 from .idle import IdleIsolator
 #from .cycle_limit import MemoryIsolator

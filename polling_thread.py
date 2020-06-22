@@ -33,7 +33,8 @@ class PollingThread(Thread, metaclass=Singleton):
         self._node_type = MachineChecker.get_node_type()
 
         # FIXME: hard-coded `self._rmq_host`
-        self._rmq_host = 'jetson1'
+        #self._rmq_host = 'jetson1'
+        self._rmq_host = 'localhost'
         self._rmq_creation_exchange = f'workload_creation({self._rmq_host})'
         self._rmq_bench_exchange = ''
 
@@ -82,6 +83,7 @@ class PollingThread(Thread, metaclass=Singleton):
                         ch: BlockingChannel, method: Basic.Deliver, _: BasicProperties, body: bytes) -> None:
         metric = json.loads(body.decode())
         ch.basic_ack(method.delivery_tag)
+        """
         if self._node_type == NodeType.IntegratedGPU:
             item = BasicMetric(metric['llc_references'],
                                metric['llc_misses'],
@@ -92,16 +94,21 @@ class PollingThread(Thread, metaclass=Singleton):
                                metric['gpu_emc_util'],
                                metric['gpu_emc_freq'],
                                workload.perf_interval)
-        if self._node_type == NodeType.CPU:
-            item = BasicMetric(metric['llc_references'],
-                               metric['llc_misses'],
-                               metric['instructions'],
-                               metric['cycles'],
-                               0,
-                               0,
-                               0,
-                               0,
-                               workload.perf_interval)
+        """
+        #if self._node_type == NodeType.CPU:
+        #print(f'[cbk_wl_monitor] metric: {metric}')
+        item = BasicMetric(metric['llc_references'],
+                           metric['llc_misses'],
+                           metric['instructions'],
+                           metric['cycles'],
+                           metric['stall_cycles'],
+                           metric['wall_cycles'],
+                           metric['intra_coh'],
+                           metric['inter_coh'],
+                           metric['llc_size'],
+                           metric['local_mem'],
+                           metric['remote_mem'],
+                           workload.perf_interval)
 
         logger = logging.getLogger(f'monitoring.metric.{workload}')
         logger.debug(f'{metric} is given from ')

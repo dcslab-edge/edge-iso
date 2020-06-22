@@ -60,7 +60,7 @@ class MachineChecker:
         :return: the CPU type which is either Intel (x86_64) or ARM (aarch64)
         """
         info = cpuinfo.get_cpu_info()
-        cpu_arch = info['raw_arch_string']
+        cpu_arch = info['arch_string_raw']
         return cpu_arch
 
     @staticmethod

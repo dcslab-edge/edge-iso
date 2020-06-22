@@ -1,12 +1,15 @@
 {
-    "name": "particlefilter",
-    "runtime": 165.73934030532837,
-    "llc_references": 196970178.47272727,
-    "llc_misses": 32734.70303030303,
-    "instructions": 13707680528.030302,
-    "cycles": 4824180352.042424,
-    "gpu_core_util": 0,
-    "gpu_core_freq": 0,
-    "gpu_emc_util": 0,
-    "gpu_emc_freq": 0
+	"name": "particlefilter",
+	"runtime": 88.62292170524597,
+	"llc_references": 1644216187.5072298,
+	"llc_misses": 716752.0994794678,
+	"instructions": 26348741815.98612,
+	"cycles": 9531916426.674377,
+	"stall_cycles": 888746471.1162521,
+	"wall_cycles": 2112264332.689416,
+	"intra_coh": 25106.81318681319,
+	"inter_coh": 13258.438403701562,
+	"llc_size": 41439544.54618474,
+	"local_mem": 45910071.67148641,
+	"remote_mem": 1370608.3053788315
 }

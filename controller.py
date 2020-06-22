@@ -15,7 +15,7 @@ import psutil
 import libs
 from libs.isolation import NextStep
 from libs.isolation.isolators import Isolator
-from libs.isolation.policies import EdgePolicy, EdgeWViolationPolicy, IsolationPolicy
+from libs.isolation.policies import XeonPolicy, XeonWViolationPolicy, IsolationPolicy
 # from libs.isolation.swapper import SwapIsolator
 from pending_queue import PendingQueue
 from polling_thread import PollingThread
@@ -28,7 +28,7 @@ MIN_PYTHON = (3, 6)
 
 class Controller:
     def __init__(self, metric_buf_size: int, binding_cores: Set[int]) -> None:
-        self._pending_queue: PendingQueue = PendingQueue(EdgeWViolationPolicy)
+        self._pending_queue: PendingQueue = PendingQueue(XeonWViolationPolicy)
 
         self._interval: float = 0.1  # scheduling interval (sec)
         self._profile_interval: float = 1.0  # check interval for phase change (sec)
@@ -68,7 +68,8 @@ class Controller:
 
                 #print(group.profile_needed())
 
-                logger.info(f'[_isolate_workloads] int(self._profile_interval/self._interval: {int(self._profile_interval / self._interval)}')
+                logger.info(f'[_isolate_workloads] int(self._profile_interval/self._interval): '
+                            f'{int(self._profile_interval / self._interval)}')
                 #logger.info(f'[_isolate_workloads] group.profile_needed(): {group.profile_needed()}')
                 if group.in_solorun_profiling:
                     # Stop condition

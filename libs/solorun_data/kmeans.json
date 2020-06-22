@@ -1,12 +1,15 @@
 {
-    "name": "kmeans",
-    "runtime": 42.67498826980591,
-    "llc_references": 2007373.086124402,
-    "llc_misses": 853098.8995215311,
-    "instructions": 12823317669.306221,
-    "cycles": 5267889581.578947,
-    "gpu_core_util": 0,
-    "gpu_core_freq": 0,
-    "gpu_emc_util": 0,
-    "gpu_emc_freq": 0
+	"name": "kmeans",
+	"runtime": 40.35035014152527,
+	"llc_references": 185422775.6756757,
+	"llc_misses": 19463647.593307592,
+	"instructions": 13773966502.368084,
+	"cycles": 9490958570.579151,
+	"stall_cycles": 3637396000.0,
+	"wall_cycles": 2109259512.4581723,
+	"intra_coh": 127064823.73230374,
+	"inter_coh": 11076.190476190477,
+	"llc_size": 40324710.4,
+	"local_mem": 1297946805.868726,
+	"remote_mem": 6836998.918918919
 }

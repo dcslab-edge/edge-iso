@@ -94,17 +94,21 @@ class ResCtrl:
         return socket_masks
 
     @staticmethod
-    def get_llc_bits_from_mask(input_list: List[str]) -> List[int]:
+    def get_llc_bits_from_mask(masks: List[str]) -> List[int]:
         """
-        :param input_list: Assuming the elements of list is hex_str such as "0xfffff"
+        :param masks: Assuming the elements of list is hex_str such as "0xfffff"
         :return:
         """
         output_list = list()
-        for mask in input_list:
+        for mask in masks:
             hex_str = mask
+            print(f'hex_str: {hex_str}')
             hex_int = int(hex_str, 16)
+            print(f'hex_int: {hex_int}')
             bin_tmp = bin(hex_int)
+            print(f'bin_tmp: {bin_tmp}, type: {type(bin_tmp)}')
             llc_bits = len(bin_tmp.lstrip('0b'))
+            print(f'llc_bits: {llc_bits}')
             output_list.append(llc_bits)
         return output_list
 
@@ -115,3 +119,69 @@ class ResCtrl:
         for llc_bits in llc_bits_list:
             ret_llc_bits += llc_bits
         return ret_llc_bits
+
+    @staticmethod
+    def get_llc_bit_ranges_from_mask(masks: List[str]) -> List[List[int]]:
+        """
+        :param masks: ["0xfffff","0xfffff"]
+        :return: output_list: [[0,19], [0,19]] ; llc bit ranges for all sockets
+        """
+        output_list = list()
+        for mask in masks:
+            hex_str = mask
+            print(f'hex_str: {hex_str}')
+            hex_int = int(hex_str, 16)
+            print(f'hex_int: {hex_int}')
+            bin_tmp = bin(hex_int).lstrip('0b')
+            print(f'bin_tmp: {bin_tmp}')
+            s = bin_tmp.find('1')
+            e = bin_tmp.rfind('1')
+            llc_range = [s, e]
+            output_list.append(llc_range)
+        return output_list
+
+    @staticmethod
+    def update_llc_ranges(in1: List[List[int]],
+                          in2: List[List[int]],
+                          op: str) -> List[List[int]]:
+        out_list = []
+        new_llc_range = int('1'*20)
+        for r1, r2 in in1, in2:
+            s1 = r1[0]
+            e1 = r1[1]
+            len_in1 = e1 - s1 + 1
+            llc_range_in1 = '0'*s1 + '1'*len_in1 + '0'*(19-e1)
+            s2 = r2[0]
+            e2 = r2[1]
+            len_in2 = e2 - s2 + 1
+            llc_range_in2 = '0'*s2 + '1'*len_in2 + '0'*(19-e2)
+            if op == '+':
+                new_llc_range = int(llc_range_in1) | int(llc_range_in2)
+            elif op == '-':
+                new_llc_range = int(llc_range_in1) ^ int(llc_range_in2)
+
+            new_s = str(new_llc_range).find('1')
+            new_e = str(new_llc_range).rfind('1')
+            out_list.append([new_s, new_e])
+        print(f'out_list: {out_list}')
+        return out_list
+
+    @staticmethod
+    def get_llc_mask_from_ranges(ranges: List[List[int]]) -> List[str]:
+        """
+        It converts ranges to masks ([[0,19], [0,19]] -> ['fffff', 'fffff']
+        :param ranges:
+        :return:
+        """
+        masks = []
+        for r in ranges:
+            s = r[0]
+            e = r[1]
+            len_r = e - s + 1
+            mask = '0'*s+'1'*len_r+'0'*(19-e)
+            masks.append(mask)
+        return masks
+
+
+
+

@@ -5,8 +5,8 @@ from abc import ABCMeta, abstractmethod
 from typing import ClassVar, Dict, Tuple, Type, Set, Iterable, Optional, Any, List
 
 from .. import ResourceType, NextStep
-from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, \
-GPUFreqThrottleIsolator, CPUFreqThrottleIsolator, SchedIsolator, AffinityIsolator
+from ..isolators import Isolator, IdleIsolator, CycleLimitIsolator, CacheIsolator, \
+    GPUFreqThrottleIsolator, CPUFreqThrottleIsolator, SchedIsolator, AffinityIsolator
 # from ..isolators import CacheIsolator, IdleIsolator, Isolator, MemoryIsolator, SchedIsolator
 # from ..isolators.affinity import AffinityIsolator
 from ...metric_container.basic_metric import BasicMetric, MetricDiff
@@ -38,8 +38,11 @@ class IsolationPolicy(metaclass=ABCMeta):
         self._node_type = MachineChecker.get_node_type()
         # TODO: Discrete GPU case
         if self._node_type == NodeType.CPU:
-            self._all_cores = tuple(range(0, 8, 1))
+            self._all_cores = tuple(range(0, 16, 1))
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
+                (AffinityIsolator, AffinityIsolator(self._lc_wls, self._be_wls)),
+                (CacheIsolator, CacheIsolator(self._lc_wls, self._be_wls)),
+                (CPUFreqThrottleIsolator, CPUFreqThrottleIsolator(self._lc_wls, self._be_wls)),
                 (CycleLimitIsolator, CycleLimitIsolator(self._lc_wls, self._be_wls)),
                 (SchedIsolator, SchedIsolator(self._lc_wls, self._be_wls)),
             ))
@@ -400,12 +403,12 @@ class IsolationPolicy(metaclass=ABCMeta):
         # calculate average solo-run data
         for wl in self._profile_target_wls:
             wl.collect_metrics()
-            logger.debug(f'number of collected solorun data: {len(wl.profile_metrics)}')
+            logger.debug(f'[stop_solorun_profiling] number of collected solorun data: {len(wl.profile_metrics)}')
             wl._avg_solorun_data = BasicMetric.calc_avg(wl.profile_metrics, len(wl.profile_metrics))
-            logger.info(f'calculated average solorun data: {wl.avg_solorun_data}')
+            logger.info(f'[stop_solorun_profiling] calculated average solorun data: {wl.avg_solorun_data}')
             wl.metrics.clear()  # clear metrics
 
-        logger.debug('Restoring configuration...')
+        logger.debug('[stop_solorun_profiling] Restoring configuration...')
         # restore stored configuration
         for isolator in self._isolator_map.values():
             isolator.load_cur_config()
@@ -493,14 +496,14 @@ class IsolationPolicy(metaclass=ABCMeta):
             if lc_wl.avg_solorun_data is not None and not lc_wl.calc_metric_diff().verify():
                 self._solorun_verify_violation_count[lc_wl] += 1
                 if self._solorun_verify_violation_count[lc_wl] == self._VERIFY_THRESHOLD:
-                    logger.debug(f'[profile_needed] fail to verify solorun data. {lc_wl.calc_metric_diff()}')
+                    logger.info(f'[profile_needed] fail to verify solorun data. {lc_wl.calc_metric_diff()}')
                     lc_wl.need_profiling = True
                     ret = True
 
             # When the number of threads are changed (`avg_solorun_data` needs to be updated)
             cur_num_threads = lc_wl.number_of_threads
             if cur_num_threads is not 0 and self._cached_lc_num_threads[lc_wl] != cur_num_threads:
-                logger.debug(f'[profile_needed] number of threads. cached: {self._cached_lc_num_threads[lc_wl]}, '
+                logger.info(f'[profile_needed] number of threads. cached: {self._cached_lc_num_threads[lc_wl]}, '
                              f'current : {cur_num_threads}')
                 lc_wl.need_profiling = True
                 ret = True
@@ -611,10 +614,12 @@ class IsolationPolicy(metaclass=ABCMeta):
         # FIXME: metrics is hard-coded
         metrics = ['mem_bw', 'mem_bw_diff', 'llc_hr_diff', 'instr_diff']
         for wl in self._all_wls:
-            wl.update_calc_metrics()
-            for metric in metrics:
-                #logger.info(f'{wl.calc_metrics}')
-                self._cur_metrics[metric][wl] = wl.calc_metrics[metric]
+            if len(wl.metrics) > 0:
+                wl.update_calc_metrics()
+                for metric in metrics:
+                    #logger.info(f'{wl.calc_metrics}')
+                    self._cur_metrics[metric][wl] = wl.calc_metrics[metric]
+            #else:?
 
     def choosing_wl_for(self, objective: str, sort_criteria: str, highest: bool) -> None:
         """

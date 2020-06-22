@@ -1,13 +1,15 @@
 {
-    "name": "nn",
-    "runtime": 45.2781662940979,
-    "llc_references": 24148723.5426009,
-    "llc_misses": 1532005.8968609865,
-    "instructions": 9237190878.295963,
-    "cycles": 7155638219.035874,
-    "gpu_core_util": 0,
-    "gpu_core_freq": 0,
-    "gpu_emc_util": 0,
-    "gpu_emc_freq": 0
-
+	"name": "nn",
+	"runtime": 74.64870262145996,
+	"llc_references": 93579887.43448275,
+	"llc_misses": 1771182.1103448276,
+	"instructions": 9515542575.682758,
+	"cycles": 16870611064.193104,
+	"stall_cycles": 10460715115.931034,
+	"wall_cycles": 2114596987.3655174,
+	"intra_coh": 63552416.08275862,
+	"inter_coh": 22423.144827586206,
+	"llc_size": 40148534.0621118,
+	"local_mem": 131959673.82068965,
+	"remote_mem": 14083460.413793104
 }

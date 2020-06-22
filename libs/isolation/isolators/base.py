@@ -24,7 +24,8 @@ class Isolator(metaclass=ABCMeta):
         self._dealloc_target_wl = None
 
         # FIXME: hard-coded for Jetson TX2 case
-        self._all_cores = tuple([0, 3, 4, 5])
+        #self._all_cores = tuple([0, 3, 4, 5])
+        self._all_cores = tuple(range(0, 16, 1))
         self._all_lc_cores = None
         self._all_be_cores = None
         self.update_allocated_cores()

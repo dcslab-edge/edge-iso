@@ -29,9 +29,9 @@ class AffinityIsolator(Isolator):
             # FIXME: hard-coded part (core range)
             self._all_cores = tuple([0, 3, 4, 5])
             self._MIN_CORES = 1
-        elif self._node_type is NodeType.DiscreteGPU:
+        elif self._node_type is NodeType.DiscreteGPU or self._node_type is NodeType.CPU:
             # FIXME: hard-coded part (core range)
-            self._all_cores = tuple(range(0, 8, 1))
+            self._all_cores = tuple(range(0, 16, 1))
             self._MIN_CORES = 1
         self._available_cores: Optional[Tuple[int]] = Isolator.available_cores()
         self._chosen_alloc: Optional[int] = None
