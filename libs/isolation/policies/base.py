@@ -113,10 +113,10 @@ class IsolationPolicy(metaclass=ABCMeta):
         logger.info(f'original diffs\' values')
 
         for idx, lc_wl in enumerate(self._lc_wls):
-            logger.info(f'latency-critical[{idx}] {lc_wl.name}-{lc_wl.pid} : {lc_wl.calc_metric_diff()}')
+            logger.critical(f'latency-critical[{idx}] {lc_wl.name}-{lc_wl.pid} : {lc_wl.calc_metric_diff()}')
 
         for idx, be_wl in enumerate(self._be_wls):
-            logger.info(f'best-effort[{idx}] {be_wl.name}-{be_wl.pid} : {be_wl.calc_metric_diff()}')
+            logger.critical(f'best-effort[{idx}] {be_wl.name}-{be_wl.pid} : {be_wl.calc_metric_diff()}')
 
         #resources = ((ResourceType.CACHE, metric_diff.llc_hit_ratio),
         #             (ResourceType.MEMORY, metric_diff.local_mem_util_ps))
@@ -137,7 +137,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         elif diff_slack is not None:
             resource_slacks = metric_diff.calc_by_diff_slack(diff_slack)
 
-        logger.info(f'resource_slack of {target_wl.name}-{target_wl.pid} is calculated '
+        logger.critical(f'resource_slack of {target_wl.name}-{target_wl.pid} is calculated '
                     f'by using `diff_slack` of {diff_slack}: {resource_slacks}')
 
         # logger.info(f'resource_slacks: {resource_slacks}, type: {type(resource_slacks)}')
@@ -156,7 +156,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         resource_slacks = self.contentious_resources(self.perf_target_wl)
         # Check whether resource contention is ResourceType.CPU
         free_cores_set = self.update_allocated_cores()
-        logger.info(f'resoruces_slack: {resource_slacks}, free_cores:{len(free_cores_set)}')
+        logger.info(f'[update_dominant_contention] resoruces_slack: {resource_slacks}')
         logger.critical(f'[update_dominant_contention] free_cores_set: {free_cores_set}')
         logger.critical(f'[update_dominant_contention] self.check_excess_cpus_wls(): {self.check_excess_cpus_wls()}')
         #if len(free_cores_set) > 0 or self.check_excess_cpus_wls():
@@ -824,122 +824,3 @@ class IsolationPolicy(metaclass=ABCMeta):
         logger.debug(f"[choose_isolation_target] alloc_target_wl: {self._cur_isolator.alloc_target_wl}")
         logger.debug(f"[choose_isolation_target] dealloc_target_wl: {self._cur_isolator.dealloc_target_wl}")
         logger.debug(f"[choose_isolation_target] perf_target_wl: {self._cur_isolator.perf_target_wl}")
-
-    #
-    # @staticmethod
-    # def choose_wl_of_diff(set_of_wl: Set[Workload], res_type: ResourceType, lowest_diff: bool) -> Workload:
-    #     """
-    #     Choose a workload which has either the highest or the lowest diff.
-    #     It is decided based on resource type and reverse flag (e.g., max diff or min diff)
-    #     :res_type: ResourceType which needs to be sorted
-    #     :is_lowest: if True, then it chooses the lowest diff, otherwise, it chooses the highest diff
-    #     :return:
-    #     """
-    #     logger = logging.getLogger(__name__)
-    #
-    #     target_wl = None
-    #     min_diff = 0
-    #     max_diff = -1000
-    #
-    #     for wl in set_of_wl:
-    #         curr_metric_diff = wl.calc_metric_diff()
-    #         if res_type is ResourceType.CPU:
-    #             curr_diff = curr_metric_diff.instruction_ps
-    #         elif res_type is ResourceType.CACHE:
-    #             curr_diff = curr_metric_diff.llc_hit_ratio
-    #         else:
-    #             # if res_type is ResourceType.MEMORY
-    #             curr_diff = curr_metric_diff.local_mem_util_ps
-    #
-    #         if lowest_diff is True:
-    #             if curr_diff < min_diff:
-    #                 min_diff = curr_diff
-    #                 target_wl = wl
-    #         elif lowest_diff is False:
-    #             if curr_diff > max_diff:
-    #                 max_diff = curr_diff
-    #                 target_wl = wl
-    #
-    #     if target_wl is None:
-    #         logger.info(f'target_wl ([{target_wl.wl_type}] {target_wl.name}-{target_wl.pid}) is None!')
-    #     if target_wl is not None:
-    #         if lowest_diff is True:
-    #             logger.info(f'lowest_diff target_wl: [{target_wl.wl_type}] '
-    #                         f'{target_wl.name}-{target_wl.pid}, '
-    #                         f'the_lowest_diff: {min_diff}')
-    #         elif lowest_diff is False:
-    #             logger.info(f'highest_diff target_wl: [{target_wl.wl_type}] '
-    #                         f'{target_wl.name}-{target_wl.pid}, '
-    #                         f'the_highest_diff: {max_diff}')
-    #
-    #     return target_wl
-    #
-    # def choose_workload_for_alloc(self) -> Workload:
-    #     """
-    #     This function finds which workload should be prioritized for performance improvement
-    #     :return:
-    #     """
-    #     logger = logging.getLogger(__name__)
-    #     target_wl = None
-    #     target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=ResourceType.CPU, lowest_diff=True)
-    #     if target_lc_wl is None:
-    #         logger.info('Not any latency-critical workload is chosen!')
-    #         target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=ResourceType.CPU, lowest_diff=True)
-    #         if target_be_wl is None:
-    #             logger.info('Not any workload is running!')
-    #         elif target_be_wl is not None:
-    #             target_wl = target_be_wl
-    #             logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
-    #     elif target_lc_wl is not None:
-    #         logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
-    #         target_wl = target_lc_wl
-    #
-    #     return target_wl
-    #
-    # def choose_workload_for_dealloc_v1(self) -> Workload:
-    #     """
-    #     This function chooses a workload that has less sensitive to the contention.
-    #     (highest diff value for corresponding isolator)
-    #     :return:
-    #     """
-    #     # FIXME: target workload for deallocation needs to be changed!! (BE first & LC last)
-    #     logger = logging.getLogger(__name__)
-    #     target_wl = None
-    #     target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=ResourceType.CPU, lowest_diff=False)
-    #     if target_be_wl is None:
-    #         logger.info('Not any best-effort workload is chosen!')
-    #         target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=ResourceType.CPU, lowest_diff=False)
-    #         if target_lc_wl is None:
-    #             logger.info('Not any workload is running!')
-    #         elif target_lc_wl is not None:
-    #             target_wl = target_lc_wl
-    #             logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
-    #     elif target_be_wl is not None:
-    #         logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
-    #         target_wl = target_be_wl
-    #
-    #     return target_wl
-    #
-    # def choose_workload_for_dealloc_v2(self, res_type: ResourceType) -> Workload:
-    #     """
-    #     This function chooses a workload that has less sensitive to the contention.
-    #     (highest diff value for corresponding isolator)
-    #     :return:
-    #     """
-    #     # FIXME: target workload for deallocation needs to be changed!! (BE first & LC last)
-    #     logger = logging.getLogger(__name__)
-    #     target_wl = None
-    #     target_be_wl = self.choose_wl_of_diff(self._be_wls, res_type=res_type, lowest_diff=False)
-    #     if target_be_wl is None:
-    #         logger.info('Not any best-effort workload is chosen!')
-    #         target_lc_wl = self.choose_wl_of_diff(self._lc_wls, res_type=res_type, lowest_diff=False)
-    #         if target_lc_wl is None:
-    #             logger.info('Not any workload is running!')
-    #         elif target_lc_wl is not None:
-    #             target_wl = target_lc_wl
-    #             logger.info(f'Latency-critical workload ({target_lc_wl.name}-{target_lc_wl.pid})is chosen!')
-    #     elif target_be_wl is not None:
-    #         logger.info(f'Best-effort workload ({target_be_wl.name}-{target_be_wl.pid})is chosen!')
-    #         target_wl = target_be_wl
-    #
-    #     return target_wl

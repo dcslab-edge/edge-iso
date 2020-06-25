@@ -76,8 +76,8 @@ class AffinityIsolator(Isolator):
             return False
         self.get_available_cores()
         logger.critical(f'[is_max_level:affinity] self.available_cores: {self._available_cores}')
-        return len(self._available_cores) <= 0  # HIS
-        #return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True # edge-iso
+        #return len(self._available_cores) <= 0  # HIS
+        return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True # edge-iso
 
     @property
     def is_min_level(self) -> bool:

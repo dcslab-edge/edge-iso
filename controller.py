@@ -57,8 +57,8 @@ class Controller:
         #logger.info(f'[_isolate_workloads] before entering for loop, self._isolation_groups: {self._isolation_groups}')
         for group, iteration_num in self._isolation_groups.items():
             #logger.info(f'[_isolate_workloads] just entering for loop, self._isolation_groups: {self._isolation_groups}')
-            logger.info('')
-            logger.info(f'***************isolation of {group.name} #{iteration_num} ({group.cur_isolator})***************')
+            logger.critical('')
+            logger.critical(f'***************isolation of {group.name} #{iteration_num} ({group.cur_isolator})***************')
             #print(group.in_solorun_profiling)
             try:
                 #print("============val debug=============")

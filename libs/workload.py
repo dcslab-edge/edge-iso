@@ -231,7 +231,7 @@ class Workload:
 
     def calc_metric_diff(self, core_norm: float = 1) -> MetricDiff:
         logger = logging.getLogger(__name__)
-        logger.info(f'[calc_metric_diff] wl: {self.name}, self._metric: {self._metrics}')
+        logger.debug(f'[calc_metric_diff] wl: {self.name}, self._metric: {self._metrics}')
         try:
             curr_metric: BasicMetric = self._metrics[0]
             logger.debug(f'[calc_metric_diff] curr_metric(self._metrics[0]): {curr_metric}')
