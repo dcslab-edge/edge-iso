@@ -42,11 +42,11 @@ class XeonPolicy(IsolationPolicy):
             #if isolator.is_max_level is True:
             #    isolator = self._isolator_map[CycleLimitIsolator]
         elif self._dom_res_cont is ResourceType.MEMORY:
-            isolator = self._isolator_map[CPUFreqThrottleIsolator]  # Per-Core DVFS
-            #isolator = self._isolator_map[SchedIsolator]
+            #isolator = self._isolator_map[CPUFreqThrottleIsolator]  # Per-Core DVFS
+            isolator = self._isolator_map[SchedIsolator]
             if isolator.is_max_level is True:
-                isolator = self._isolator_map[SchedIsolator]        # CPU Allocation (to BE wl)
-                #isolator = self._isolator_map[CPUFreqThrottleIsolator]  # Per-Core DVFS
+                #isolator = self._isolator_map[SchedIsolator]        # CPU Allocation (to BE wl)
+                isolator = self._isolator_map[CPUFreqThrottleIsolator]  # Per-Core DVFS
 
         else:
             raise NotImplementedError(f'Unknown ResourceType: {self._dom_res_cont}')

@@ -78,7 +78,7 @@ class CPUFreqThrottleIsolator(Isolator):
             if wl is not None:
                 #logger.info(f'[enforce] self._cur_steps[wl]: {self._cur_steps[wl]}')
                 freq = self._cpufreq_range[self._cur_steps[wl]]
-                logger.info(f'CPU core frequencies of {wl.name}\'s is {freq/1_000_000_000}GHz')
+                logger.critical(f'[enforce:DVFS][HW] CPU core frequencies of {wl.name}\'s is {freq/1_000_000}GHz')
 
         for wl in wls:
             if wl is not None:

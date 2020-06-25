@@ -1,5 +1,7 @@
 # coding: UTF-8
 
+import logging
+
 import re
 import subprocess
 from pathlib import Path
@@ -46,9 +48,11 @@ class ResCtrl:
                        input=f'{pid}\n', check=True, encoding='ASCII', stdout=subprocess.DEVNULL)
 
     def assign_llc(self, *masks: str) -> None:
+        logger = logging.getLogger(__name__)
         masks = (f'{i}={mask}' for i, mask in enumerate(masks))
         mask = ';'.join(masks)
         # subprocess.check_call('ls -ll /sys/fs/resctrl/', shell=True)
+        logger.debug(f'[assign_llc] mask: {mask}')
         subprocess.run(args=('sudo', 'tee', str(self._group_path / 'schemata')),
                        input=f'L3:{mask}\n', check=True, encoding='ASCII', stdout=subprocess.DEVNULL)
 
@@ -102,13 +106,13 @@ class ResCtrl:
         output_list = list()
         for mask in masks:
             hex_str = mask
-            print(f'hex_str: {hex_str}')
+            #print(f'hex_str: {hex_str}')
             hex_int = int(hex_str, 16)
-            print(f'hex_int: {hex_int}')
+            #print(f'hex_int: {hex_int}')
             bin_tmp = bin(hex_int)
-            print(f'bin_tmp: {bin_tmp}, type: {type(bin_tmp)}')
+            #print(f'bin_tmp: {bin_tmp}, type: {type(bin_tmp)}')
             llc_bits = len(bin_tmp.lstrip('0b'))
-            print(f'llc_bits: {llc_bits}')
+            #print(f'llc_bits: {llc_bits}')
             output_list.append(llc_bits)
         return output_list
 
@@ -126,17 +130,21 @@ class ResCtrl:
         :param masks: ["0xfffff","0xfffff"]
         :return: output_list: [[0,19], [0,19]] ; llc bit ranges for all sockets
         """
+        logger = logging.getLogger(__name__)
         output_list = list()
         for mask in masks:
             hex_str = mask
-            print(f'hex_str: {hex_str}')
+            #print(f'hex_str: {hex_str}')
             hex_int = int(hex_str, 16)
-            print(f'hex_int: {hex_int}')
-            bin_tmp = bin(hex_int).lstrip('0b')
-            print(f'bin_tmp: {bin_tmp}')
+            logger.debug(f'[get_llc_bit_ranges_from_mask] hex_int: {hex_int}')
+            #print(f'hex_int: {hex_int}')
+            #bin_tmp = bin(hex_int).lstrip('0b')
+            bin_tmp = format(hex_int, '020b')
+            logger.debug(f'[get_llc_bit_ranges_from_mask] bin_tmp: {bin_tmp}')
             s = bin_tmp.find('1')
             e = bin_tmp.rfind('1')
             llc_range = [s, e]
+            logger.debug(f'[get_llc_bit_ranges_from mask] llc_range: {llc_range}')
             output_list.append(llc_range)
         return output_list
 
@@ -144,26 +152,50 @@ class ResCtrl:
     def update_llc_ranges(in1: List[List[int]],
                           in2: List[List[int]],
                           op: str) -> List[List[int]]:
+        """
+        It performs operations for two llc_ranges
+        :param in1: 1st llc_ranges
+        :param in2: 2nd llc_ranges
+        :param op:  operation type
+        :return: 1st llc_ranges (op) 2nd llc_ranges
+        """
+
+        logger = logging.getLogger(__name__)
+
         out_list = []
         new_llc_range = int('1'*20)
-        for r1, r2 in in1, in2:
-            s1 = r1[0]
-            e1 = r1[1]
+        #logger.critical(f'in1: {in1}, in2: {in2}')
+
+        for idx in range(len(in1)):
+            r_in1 = in1[idx]
+            r_in2 = in2[idx]
+
+            s1 = r_in1[0]
+            e1 = r_in1[1]
             len_in1 = e1 - s1 + 1
             llc_range_in1 = '0'*s1 + '1'*len_in1 + '0'*(19-e1)
-            s2 = r2[0]
-            e2 = r2[1]
+
+            s2 = r_in2[0]
+            e2 = r_in2[1]
             len_in2 = e2 - s2 + 1
             llc_range_in2 = '0'*s2 + '1'*len_in2 + '0'*(19-e2)
-            if op == '+':
-                new_llc_range = int(llc_range_in1) | int(llc_range_in2)
-            elif op == '-':
-                new_llc_range = int(llc_range_in1) ^ int(llc_range_in2)
 
-            new_s = str(new_llc_range).find('1')
-            new_e = str(new_llc_range).rfind('1')
+            #logger.critical(f'[update_llc_ranges] llc_range_in1: {llc_range_in1},'
+            #                f'llc_range_in2: {llc_range_in2}, op: {op}')
+            if op == '+':
+                new_llc_range = int(llc_range_in1, 2) | int(llc_range_in2, 2)
+            elif op == '-':
+                overlapped_range = int(llc_range_in1, 2) & int(llc_range_in2, 2)
+                new_llc_range = int(llc_range_in1, 2) ^ overlapped_range
+
+            #logger.critical(f'[update_llc_ranges] new_llc_range: {hex(new_llc_range)}')
+
+            new_s = format(new_llc_range, '020b').find('1')
+            new_e = format(new_llc_range, '020b').rfind('1')
+            #logger.critical(f'[update_llc_ranges] new_s: {new_s}, new_e: {new_e}')
             out_list.append([new_s, new_e])
-        print(f'out_list: {out_list}')
+        #logger.critical(f'[update_llc_ranges] out_list: {out_list}')
+        #print(f'out_list: {out_list}')
         return out_list
 
     @staticmethod
@@ -173,13 +205,25 @@ class ResCtrl:
         :param ranges:
         :return:
         """
+        logger = logging.getLogger(__name__)
         masks = []
+
+        logger.debug(f'[get_llc_mask_from_ranges] ranges: {ranges}')
         for r in ranges:
             s = r[0]
             e = r[1]
+            logger.debug(f'[get_llc_mask_from_ranges] r: {r}, s: {s}, e: {e}')
+            if s == -1 and e == -1:
+                mask = hex(int('0', 2))
+                masks.append(mask)
+                logger.debug(f'[get_llc_mask_from_ranges] r: {r}, mask: {mask}')
+                continue
             len_r = e - s + 1
             mask = '0'*s+'1'*len_r+'0'*(19-e)
+            logger.debug(f'[get_llc_mask_from_ranges] r: {r}, mask: {mask}')
+            mask = hex(int(mask, 2))
             masks.append(mask)
+        logger.debug(f'[get_llc_mask_from_ranges] masks: {masks}')
         return masks
 
 

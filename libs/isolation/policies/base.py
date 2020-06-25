@@ -156,9 +156,11 @@ class IsolationPolicy(metaclass=ABCMeta):
         resource_slacks = self.contentious_resources(self.perf_target_wl)
         # Check whether resource contention is ResourceType.CPU
         free_cores_set = self.update_allocated_cores()
-        logger.info(f'[update_dominant_contention] free_cores_set: {free_cores_set}')
-        logger.info(f'[update_dominant_contention] self.check_excess_cpus_wls(): {self.check_excess_cpus_wls()}')
-        if len(free_cores_set) > 0 or self.check_excess_cpus_wls():
+        logger.info(f'resoruces_slack: {resource_slacks}, free_cores:{len(free_cores_set)}')
+        logger.critical(f'[update_dominant_contention] free_cores_set: {free_cores_set}')
+        logger.critical(f'[update_dominant_contention] self.check_excess_cpus_wls(): {self.check_excess_cpus_wls()}')
+        #if len(free_cores_set) > 0 or self.check_excess_cpus_wls():
+        if len(free_cores_set) > 0 and self.check_excess_cpus_wls():
             if AffinityIsolator in self._isolator_map:
                 for res, diff in resource_slacks:
                     if res is ResourceType.CPU:
@@ -166,8 +168,9 @@ class IsolationPolicy(metaclass=ABCMeta):
                         dom_res_diff = diff
                         self._dom_res_cont = dom_res_cont
                         self._dom_res_diff = dom_res_diff
-                        logger.info(f'[update_dominant_contention] self._dom_res_cont: {self._dom_res_cont}')
-                        logger.info(f'[update_dominant_contention] self._dom_res_diff: {self._dom_res_diff}')
+                        logger.critical(f'[update_dominant_contention] self._dom_res_cont: {self._dom_res_cont}, '
+                                        f'self._dom_res_diff: {self._dom_res_diff}')
+                        #logger.info(f'[update_dominant_contention] self._dom_res_diff: {self._dom_res_diff}')
                         return resource_slacks
 
         # Find dominant resource contention rather than ResourceType.CPU
@@ -179,8 +182,9 @@ class IsolationPolicy(metaclass=ABCMeta):
 
         self._dom_res_cont = dom_res_cont
         self._dom_res_diff = dom_res_diff
-        logger.info(f'[update_dominant_contention] self._dom_res_cont: {self._dom_res_cont}')
-        logger.info(f'[update_dominant_contention] self._dom_res_diff: {self._dom_res_diff}')
+        logger.critical(f'[update_dominant_contention] self._dom_res_cont: {self._dom_res_cont}, '
+                        f'self._dom_res_diff: {self._dom_res_diff}')
+        #logger.info(f'[update_dominant_contention] self._dom_res_diff: {self._dom_res_diff}')
         return resource_slacks
 
     @property
@@ -391,6 +395,7 @@ class IsolationPolicy(metaclass=ABCMeta):
         # store current configuration
         for isolator in self._isolator_map.values():
             isolator.store_cur_config()
+            #print(f'[start_solorun_profiling] ')
             isolator.reset()
 
     def stop_solorun_profiling(self) -> None:

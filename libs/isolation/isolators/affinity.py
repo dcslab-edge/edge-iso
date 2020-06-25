@@ -70,18 +70,19 @@ class AffinityIsolator(Isolator):
     def is_max_level(self) -> bool:
         # Check available cores and excess cpu flag (either one on both conditions should be met)
         logger = logging.getLogger(__name__)
-        logger.info(f'[is_max_level] self.alloc_target_wl: {self.alloc_target_wl}')
+        logger.critical(f'[is_max_level:affinity] self.alloc_target_wl: {self.alloc_target_wl}')
 
         if self.alloc_target_wl is None:
             return False
         self.get_available_cores()
-        logger.info(f'[is_max_level] self.available_cores: {self._available_cores}')
-        return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True
+        logger.critical(f'[is_max_level:affinity] self.available_cores: {self._available_cores}')
+        return len(self._available_cores) <= 0  # HIS
+        #return len(self._available_cores) <= 0 or self.alloc_target_wl.excess_cpu_flag is True # edge-iso
 
     @property
     def is_min_level(self) -> bool:
         logger = logging.getLogger(__name__)
-        logger.info(f'[is_min_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        logger.critical(f'[is_min_level:affinity] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self.dealloc_target_wl is None:
             return False
         else:
@@ -105,17 +106,17 @@ class AffinityIsolator(Isolator):
 
         self.sync_cur_steps()
         if self._cur_alloc is not None and self.alloc_target_wl is not None:
-            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
+            #logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
             self.alloc_target_wl.bound_cores = self._cur_alloc
             self._cur_steps[self.alloc_target_wl] = self._cur_alloc
             self._update_other_values("alloc")
-            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
+            logger.critical(f'[enforce:CPU Alloc (FG)][SW] affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_alloc}')
         elif self._cur_dealloc is not None and self.dealloc_target_wl is not None:
-            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
+            #logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
             self.dealloc_target_wl.bound_cores = self._cur_dealloc
             self._cur_steps[self.dealloc_target_wl] = self._cur_dealloc
             self._update_other_values("dealloc")
-            logger.info(f'affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
+            logger.critical(f'[enforce:CPU Alloc (FG)][SW] affinity of {self.perf_target_wl.name}-{self.perf_target_wl.pid} is {self._cur_dealloc}')
 
     def reset(self) -> None:
         for wl in self._all_wls:

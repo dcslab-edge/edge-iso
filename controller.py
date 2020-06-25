@@ -168,14 +168,14 @@ class Controller:
 
                 group.choose_isolation_target()
                 if group.alloc_target_wl is not None:
-                    logger.info(f'group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
+                    logger.critical(f'[_isolate_workloads] group._alloc_target_wl: {group.alloc_target_wl.name}-{group.alloc_target_wl.pid}')
                 else:
-                    logger.info(f'group._alloc_target_wl: None')
+                    logger.critical(f'[_isolate_workloads] group._alloc_target_wl: None')
 
                 if group.dealloc_target_wl is not None:
-                    logger.info(f'group._dealloc_target_wl: {group.dealloc_target_wl.name}-{group.dealloc_target_wl.pid}')
+                    logger.critical(f'[_isolate_workloads] group._dealloc_target_wl: {group.dealloc_target_wl.name}-{group.dealloc_target_wl.pid}')
                 else:
-                    logger.info(f'group._dealloc_target_wl: None')
+                    logger.critical(f'[_isolate_workloads] group._dealloc_target_wl: None')
 
                 #cur_isolator.perf_target_wl = group.perf_target_wl
 
@@ -183,7 +183,7 @@ class Controller:
                 # FIXME: decide_next_step belongs to isolator
                 # `calc_metric_diff()` is invoked in the below code to determine `next_step`.
                 decided_next_step = cur_isolator.decide_next_step()
-                logger.info(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
+                logger.critical(f'[_isolate_workloads] Monitoring Result : {decided_next_step.name}')
 
                 # group.choose_isolation_target(decided_next_step)
                 # if group.alloc_target_wl is not None:
@@ -308,17 +308,17 @@ def main() -> None:
     file_handler.setFormatter(formatter)
 
     controller_logger = logging.getLogger(__name__)
-    controller_logger.setLevel(logging.DEBUG)
+    controller_logger.setLevel(logging.WARNING)
     controller_logger.addHandler(stream_handler)
     controller_logger.addHandler(file_handler)
 
     module_logger = logging.getLogger(libs.__name__)
-    module_logger.setLevel(logging.INFO)
+    module_logger.setLevel(logging.WARNING)    # INFO
     module_logger.addHandler(stream_handler)
     module_logger.addHandler(file_handler)
 
     monitoring_logger = logging.getLogger('monitoring')
-    monitoring_logger.setLevel(logging.INFO)
+    monitoring_logger.setLevel(logging.WARNING)    # INFO
     monitoring_logger.addHandler(stream_handler)
     monitoring_logger.addHandler(file_handler)
 

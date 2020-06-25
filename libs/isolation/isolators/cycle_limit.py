@@ -80,7 +80,7 @@ class CycleLimitIsolator(Isolator):
         #logger.info(f'{self.dealloc_target_wl.name}-{self.dealloc_target_wl.pid}')
         for wl in wls:
             if wl is not None:
-                logger.info(f'limit_percentages of bound_cores of {wl.name}\'s {wl.bound_cores} is '
+                logger.critical(f'[enforce:CPU cycle limit][SW] limit_percentages of bound_cores of {wl.name}\'s {wl.bound_cores} is '
                             f'{self._cur_steps[wl]}%')
         for wl in wls:
             if wl is not None:

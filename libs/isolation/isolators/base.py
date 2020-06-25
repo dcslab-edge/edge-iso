@@ -258,11 +258,11 @@ class Isolator(metaclass=ABCMeta):
             return NextStep.IDLE
 
         curr_metric_diff = target_wl.calc_metric_diff()
-        logger.info(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
-        logger.info(f'[decide_next_step] target_wl: {target_wl}')
+        logger.critical(f'[decide_next_step] self._is_first_decision: {self._is_first_decision}')
+        logger.critical(f'[decide_next_step] target_wl: {target_wl}')
 
-        logger.info(f'[decide_next_step] self.alloc_target_wl: {self.alloc_target_wl}')
-        logger.info(f'[decide_next_step] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        logger.critical(f'[decide_next_step] self.alloc_target_wl: {self.alloc_target_wl}')
+        logger.critical(f'[decide_next_step] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self._is_first_decision[target_wl]:
             self._is_first_decision[target_wl] = False
             next_step = self._first_decision(curr_metric_diff)
