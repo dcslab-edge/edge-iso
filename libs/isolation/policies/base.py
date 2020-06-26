@@ -40,10 +40,8 @@ class IsolationPolicy(metaclass=ABCMeta):
         if self._node_type == NodeType.CPU:
             self._all_cores = tuple(range(0, 16, 1))
             self._isolator_map: Dict[Type[Isolator], Isolator] = dict((
-                (AffinityIsolator, AffinityIsolator(self._lc_wls, self._be_wls)),
                 (CacheIsolator, CacheIsolator(self._lc_wls, self._be_wls)),
                 (CPUFreqThrottleIsolator, CPUFreqThrottleIsolator(self._lc_wls, self._be_wls)),
-                (CycleLimitIsolator, CycleLimitIsolator(self._lc_wls, self._be_wls)),
                 (SchedIsolator, SchedIsolator(self._lc_wls, self._be_wls)),
             ))
         if self._node_type == NodeType.IntegratedGPU:

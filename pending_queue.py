@@ -22,7 +22,7 @@ class PendingQueue(Sized):
     def __len__(self) -> int:
         pending_queue_len = len(tuple(
             filter(lambda x: x.check_lc_wls_metrics() and x.check_be_wls_metrics(), self._pending_list)))
-        #print(f'pending_queue_len: {pending_queue_len}, self._pending_list: {self._pending_list}')
+        print(f'pending_queue_len: {pending_queue_len}, self._pending_list: {self._pending_list}')
         return pending_queue_len
         #return len(tuple(
         #        filter(lambda x: len(x.foreground_workload.metrics) > 0 and x.check_bg_wls_metrics(),
