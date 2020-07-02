@@ -78,14 +78,15 @@ class SchedIsolator(Isolator):
         wl = self.dealloc_target_wl
         self.sync_cur_steps()
         if wl is not None:
-            logger.info(f"It can deallocate {wl.name}-{wl.pid}")
-            logger.info(f"self.dealloc_target_wl : {wl}")
+            logger.warning(f"It can deallocate {wl.name}-{wl.pid}")
+            logger.warning(f"self.dealloc_target_wl : {wl}")
             self._chosen_dealloc = random.choice(wl.bound_cores)
-            logger.info(f"self._chosen_dealloc : {wl}")
+            logger.warning(f"self._chosen_dealloc : {self._chosen_dealloc}")
             self._cur_dealloc = tuple(filter(lambda x: x is not self._chosen_dealloc, wl.bound_cores))
+            logger.warning(f"self._cur_dealloc : {self._cur_dealloc}")
         elif wl is None:
-            logger.info(f"There is no dealloc_target_wl. (No workload)")
-            logger.info(f"self.dealloc_target_wl : {wl}")
+            logger.warning(f"There is no dealloc_target_wl. (No workload)")
+            logger.warning(f"self.dealloc_target_wl : {wl}")
             self._chosen_dealloc = None
             self._cur_dealloc = None
         return self
@@ -106,15 +107,16 @@ class SchedIsolator(Isolator):
         wl = self.alloc_target_wl
         self.sync_cur_steps()
         if wl is not None:
-            logger.info(f"It can allocate {wl.name}-{wl.pid}")
-            logger.info(f"self.alloc_target_wl : {wl}")
+            logger.warning(f"It can allocate {wl.name}-{wl.pid}")
+            logger.warning(f"self.alloc_target_wl : {wl}")
             self.get_available_cores()
             self._chosen_alloc = random.choice(self._available_cores)
             self._cur_alloc = tuple(self._cur_steps[wl]+(self._chosen_alloc,))
-            logger.info(f"self._chosen_dealloc : {wl}")
+            logger.warning(f"self._chosen_alloc : {self._chosen_alloc}")
+            logger.warning(f"self._cur_alloc : {self._cur_alloc}")
         elif wl is None:
-            logger.info(f"There is no alloc_target_wl. (No workload)")
-            logger.info(f"self.alloc_target_wl : {wl}")
+            logger.warning(f"There is no alloc_target_wl. (No workload)")
+            logger.warning(f"self.alloc_target_wl : {wl}")
             self._chosen_alloc = None
             self._cur_alloc = None
         return self
@@ -146,14 +148,14 @@ class SchedIsolator(Isolator):
         self.sync_cur_steps()
         if self._cur_alloc is not None and self.alloc_target_wl is not None:
             logger.critical(f'[enforce:CPU Alloc (BG)][SW] affinity of {self.alloc_target_wl.name}-{self.alloc_target_wl.pid} is '
-                        f'{self._cur_alloc}')
+                        f'{self._cur_alloc} (self._cur_alloc)')
             self.alloc_target_wl.bound_cores = self._cur_alloc
             self._cur_steps[self.alloc_target_wl] = self._cur_alloc
             self._update_other_values("alloc")
 
         elif self._cur_dealloc is not None and self.dealloc_target_wl is not None:
             logger.critical(f'[enforce:CPU Alloc (BG)][SW] affinity of {self.dealloc_target_wl.name}-{self.dealloc_target_wl.pid} is '
-                        f'{self._cur_dealloc}')
+                        f'{self._cur_dealloc} (self._cur_dealloc)')
             self.dealloc_target_wl.bound_cores = self._cur_dealloc
             self._cur_steps[self.dealloc_target_wl] = self._cur_dealloc
             self._update_other_values("dealloc")

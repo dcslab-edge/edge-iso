@@ -143,7 +143,7 @@ class CacheIsolator(Isolator):
             logger.info(f"It can allocate {wl.name}-{wl.pid}")
             logger.info(f"self.alloc_target_wl : {wl}")
 
-            self._chosen_alloc = self.free_llc_bit(self._cur_steps[wl])
+            self._chosen_alloc = self.get_free_llc_bit(self._cur_steps[wl])
             #logger.critical(f'self._chosen_alloc: {self._chosen_alloc}')
             if self._chosen_alloc >= 0:
                 chosen_alloc_bin = format(1 << (19 - self._chosen_alloc), '020b')
@@ -193,7 +193,7 @@ class CacheIsolator(Isolator):
         if self.alloc_target_wl is None:
             return False
         else:
-            return self.free_llc_bit(self._cur_steps[self.alloc_target_wl]) < 0
+            return self.get_free_llc_bit(self._cur_steps[self.alloc_target_wl]) < 0
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
@@ -249,7 +249,7 @@ class CacheIsolator(Isolator):
         self._cur_steps = self._stored_config
         self._stored_config = None
 
-    def free_llc_bit(self, wl_llc_ranges: List[List[int]]) -> int:
+    def get_free_llc_bit(self, wl_llc_ranges: List[List[int]]) -> int:
         """
         It returns a `free_llc_bit' near to the llc_mask of wl_alloc_target
         :return: free llc it: non-negative integer (0~19), no free llc bit: -1
@@ -263,7 +263,7 @@ class CacheIsolator(Isolator):
         s, e = llc_range[0], llc_range[1]
         candidate_bits = [s - ResCtrl.STEP, e + ResCtrl.STEP]   # ResCtrl.STEP == 1
 
-        logger.debug(f'[free_llc_bit] self._free_llc_range[0]: {self._free_llc_ranges[0]}, candidate_bits: {candidate_bits}')
+        logger.debug(f'[get_free_llc_bit] self._free_llc_range[0]: {self._free_llc_ranges[0]}, candidate_bits: {candidate_bits}')
 
         if candidate_bits[0] > 0 and candidate_bits[0] in self._free_llc_ranges[0]:
             free_bit = candidate_bits[0]

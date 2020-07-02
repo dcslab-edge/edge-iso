@@ -44,9 +44,9 @@ class Controller:
 
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
 
-        self._isolation_threads = (IsolationThread(SchedIsolator),
-                                   IsolationThread(CacheIsolator),
-                                   IsolationThread(CPUFreqThrottleIsolator))
+        self._isolation_threads = (IsolationThread(SchedIsolator(set(), set())),)#,null set
+                                   #IsolationThread(CacheIsolator),
+                                   #IsolationThread(CPUFreqThrottleIsolator))
 
         self._cpuset = CpuSet('Heracles')
         self._binding_cores = binding_cores
@@ -85,32 +85,36 @@ class Controller:
                 target = heracles.slo_taget
                 slack: float = (target-latency)/target
                 logger.critical(f'[_isolate_workloads] slack: {slack}, load: {load}, target: {target}, latency: {latency}')
-                if slack < 0:
-                    # FIXME: hard-coded for single best-effort workloads
-                    HeraclesFunc.disable_be_wls(group.best_effort_workloads)
-                    heracles.state = State.STOP_GROWTH
-                    logger.critical(f'[_isolate_workloads] slack < 0 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
-                    # EnterCooldown()
-                elif load > 0.85:
-                    HeraclesFunc.disable_be_wls(group.best_effort_workloads)
-                    heracles.state = State.STOP_GROWTH
-                    logger.critical(f'[_isolate_workloads] load > 0.85 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
-                elif load < 0.8:
-                    heracles.enable_be_wls(group.best_effort_workloads)
-                    logger.critical(f'[_isolate_workloads] load < 0.8 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
-                elif slack < 0.1:
-                    heracles.disallow_be_growth()
-                    logger.critical(f'[_isolate_workloads] slack < 0.1 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
-                    if slack < 0.05:
-                        logger.critical(f'[_isolate_workloads] slack < 0.05 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
-                        group._cur_isolator = group._isolator_map[SchedIsolator]
-                        cur_isolator = group._cur_isolator
-                        logger.critical(f'[_isolate_workloads] slack < 0.05 case, cur_isolator: {cur_isolator}, group: {group}')
-                        for be_wl in group.best_effort_workloads:
-                            group.dealloc_target_wl = be_wl
-                            cur_isolator.dealloc_target_wl = be_wl
-                            cur_isolator.strengthen()
-                            cur_isolator.enforce()
+                if latency is not None and load is not None:
+                    if slack < 0:
+                        # FIXME: hard-coded for single best-effort workloads
+                        HeraclesFunc.disable_be_wls(group.best_effort_workloads)
+                        heracles.state = State.STOP_GROWTH
+                        logger.critical(f'[_isolate_workloads] slack < 0 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
+                        # EnterCooldown()
+                    elif load > 0.85:
+                        HeraclesFunc.disable_be_wls(group.best_effort_workloads)
+                        heracles.state = State.STOP_GROWTH
+                        logger.critical(f'[_isolate_workloads] load > 0.85 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
+                    elif load < 0.8:
+                        heracles.enable_be_wls(group.best_effort_workloads)
+                        logger.critical(f'[_isolate_workloads] load < 0.8 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
+                    elif slack < 0.1:
+                        heracles.disallow_be_growth()
+                        logger.critical(f'[_isolate_workloads] slack < 0.1 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
+                        if slack < 0.05:
+                            logger.critical(f'[_isolate_workloads] slack < 0.05 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
+                            group._cur_isolator = group._isolator_map[SchedIsolator]
+                            cur_isolator = group._cur_isolator
+                            logger.critical(f'[_isolate_workloads] slack < 0.05 case, cur_isolator: {cur_isolator}, group: {group}')
+                            for be_wl in group.best_effort_workloads:
+                                group.dealloc_target_wl = be_wl
+                                cur_isolator.dealloc_target_wl = be_wl
+                                cur_isolator.strengthen()
+                                cur_isolator.enforce()
+                else:
+                    logger.critical(f'[_isolate_workloads] latency and load information is not enough!')
+                    logger.critical(f'[_isolate_workloads] 99p tail latency: {latency}, load: {load}')
 
             except (psutil.NoSuchProcess, subprocess.CalledProcessError, ProcessLookupError):
                 pass
@@ -127,19 +131,22 @@ class Controller:
         """
         This function detects and registers the spawned workloads(threads).
         """
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('sub_controller')
 
         # set pending workloads as active
         # print(f'len of pending queue: {len(self._pending_queue)}')
         while len(self._pending_queue):
             pending_group: IsolationPolicy = self._pending_queue.pop()
-            logger.critical(f'{pending_group} is created')
+            logger.critical(f'[_register_pending_workloads] {pending_group} is created')
 
             self._isolation_groups[pending_group] = 0
             # FIXME: assumption: only one group
-            self._heracles.group = pending_group
-            for sub_con in self._heracles.sub_controllers:
-                sub_con.group = pending_group
+            if pending_group is not None:
+                self._heracles.group = pending_group
+                logger.critical(f'[_register_pending_workloads] self._heracles.group: {self._heracles.group}')
+                for sub_con in self._heracles.sub_controllers:
+                    sub_con.group = pending_group
+                    logger.critical(f'[_register_pending_workloads] sub_con.group: {sub_con.group}')
 
     def _remove_ended_groups(self) -> None:
         """
@@ -183,10 +190,14 @@ class Controller:
             self._remove_ended_groups()
             self._register_pending_workloads()
 
-            time.sleep(self._interval)
+            if self._heracles.group is not None:
+                time.sleep(self._interval)  # tunable parameter (15sec. for original heracles)
+            else:
+                # polling pending group
+                time.sleep(1)
 
             self._isolate_workloads()           # Heracles High-level controller
-            if first:
+            if first and self._heracles.group is not None:
                 self._heracles.start_sub_controllers()
                 first = False
 
@@ -222,6 +233,16 @@ def main() -> None:
     monitoring_logger.setLevel(logging.WARNING)    # INFO
     monitoring_logger.addHandler(stream_handler)
     monitoring_logger.addHandler(file_handler)
+
+    sub_controller_logger = logging.getLogger('sub_controller')
+    sub_controller_logger.setLevel(logging.WARNING)    # INFO
+    sub_controller_logger.addHandler(stream_handler)
+    sub_controller_logger.addHandler(file_handler)
+
+    heracles_logger = logging.getLogger('heracles')
+    heracles_logger.setLevel(logging.WARNING)    # INFO
+    heracles_logger.addHandler(stream_handler)
+    heracles_logger.addHandler(file_handler)
 
     binding_cores: Set[int] = convert_to_set(args.cores)
     controller = Controller(args.buf_size, binding_cores)

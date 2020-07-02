@@ -5,7 +5,7 @@ import logging
 import re
 import subprocess
 from pathlib import Path
-from typing import ClassVar, List, Pattern, Tuple
+from typing import ClassVar, List, Pattern, Tuple, Dict
 
 
 def len_of_mask(mask: str) -> int:

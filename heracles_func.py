@@ -50,7 +50,7 @@ class HeraclesFunc:
         Initializing and running sub controllers (CPU-memory sub-controller, DVFS Controller)
         :return:
         """
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('heracles')
 
         logger.critical(f'[start_sub_controllers] self._sub_controllers: {self._sub_controllers}')
         for sub_controller in self._sub_controllers:
@@ -68,7 +68,7 @@ class HeraclesFunc:
         Calculating that 99 percentile latency
         :return: None
         """
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('heracles')
         # FIXME: hard-coded for connecting remote host (currently using ip of bc3)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -90,14 +90,24 @@ class HeraclesFunc:
 
         self._latency_data = latency_data
         self._last_num_line = end_line
-        self._tail_latency = self.calc_tail(0.99)    # 99 percentile
         logger.critical(f'[poll_lc_app_latency] self._last_num_line: {self._last_num_line}')
+        #logger.critical(f'[poll_lc_app_latency] self._last_num_line: {self._last_num_line}')
+        if self._last_num_line is 0:
+            self._tail_latency = 0.0
+        else:
+            self._tail_latency = self.calc_tail(0.99)    # 99 percentile
+        #logger.critical(f'[poll_lc_app_latency] self._last_num_line: {self._last_num_line}')
         logger.critical(f'[poll_lc_app_latency] self._tail_latency: {self._tail_latency}')
 
     def calc_tail(self, percentile: float) -> float:
+        logger = logging.getLogger('heracles')
+
         sorted_lat = sorted(self._latency_data, reverse=True)
         total_reqs = len(self._latency_data)
+
         req_lat_idx = int(total_reqs*(float(1-percentile)))
+        logger.critical(f'[calc_tail] total_reqs: {total_reqs}, req_lat_idx: {req_lat_idx}')
+
         tail_val = sorted_lat[req_lat_idx]
         return tail_val
 
@@ -107,7 +117,7 @@ class HeraclesFunc:
         Calculating How many requests processed
         :return:
         """
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('heracles')
         # peak_qps = ????
         total_reqs = len(self._latency_data)
         qps: float = float(total_reqs/self._interval)
