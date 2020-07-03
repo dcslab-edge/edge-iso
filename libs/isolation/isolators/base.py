@@ -298,7 +298,7 @@ class Isolator(metaclass=ABCMeta):
             raise ValueError('Store configuration first!')
 
     @classmethod
-    def available_cores(cls) -> Tuple[int]:
+    def recv_available_cores(cls) -> Tuple[int]:
         return cls._available_cores
 
     @classmethod

@@ -30,6 +30,11 @@ class SchedIsolator(Isolator):
             self._MIN_CORES = 1
 
         self._cur_steps: Dict[Workload, Tuple[int]] = dict()
+        for lc_wl in self._latency_critical_wls:
+            self._cur_steps[lc_wl] = lc_wl.orig_bound_cores
+        for be_wl in self._best_effort_wls:
+            self._cur_steps[be_wl] = be_wl.orig_bound_cores
+
         # self._cur_memory_bw: Dict[Workload, float] = dict()
         # self._cur_memory_bw_diff: Dict[Workload, float] = dict()
         # self._cur_instr_diff: Dict[Workload, float] = dict()
@@ -49,12 +54,14 @@ class SchedIsolator(Isolator):
         self._cur_alloc: Optional[Tuple[int]] = None
         self._cur_dealloc: Optional[Tuple[int]] = None
 
-        self._available_cores: Optional[Tuple[int]] = Isolator.available_cores
-        self._allocated_cores: Optional[Tuple[int]] = None
+        self._available_cores: Optional[Tuple[int]] = Isolator.recv_available_cores()
+        self._allocated_cores: Optional[Tuple[int]] = tuple()
         for step in self._cur_steps.values():
             self._allocated_cores += step
+        self._allocated_cores = tuple(set(self._allocated_cores))
 
-        #self._available_cores = set(self._all_cores) - set(self._allocated_cores)
+        #set_avail = set(self._all_cores) - set(self._allocated_cores)
+        self._available_cores = tuple(filter(lambda x: x is not self._allocated_cores, self._available_cores))
 
         self._stored_config: Optional[Dict[Workload, Tuple[int]]] = None
 
@@ -126,7 +133,7 @@ class SchedIsolator(Isolator):
         # At least, a process needs one core for its execution - strengthen condition 1 (in `self._choosing_wl_for()`)
         # FIXME: hard-coded CPUSET.STEP (e.g., 1)
         logger = logging.getLogger(__name__)
-        logger.info(f'[is_max_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        logger.critical(f'[is_max_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self.dealloc_target_wl is None:
             return False
         else:
@@ -167,8 +174,10 @@ class SchedIsolator(Isolator):
         :return:
         """
         for wl in self._all_wls:
-            if wl.is_running:
-                wl.bound_cores = wl.orig_bound_cores
+            if wl.is_running and wl.wl_type == 'BE':
+                wl.bound_cores = tuple(range(8, 16, 1))
+            elif wl.is_running and wl.wl_type == 'LC':
+                wl.bound_cores = tuple(range(0, 8, 1))
 
     def store_cur_config(self) -> None:
         self._stored_config = self._cur_steps
@@ -186,7 +195,7 @@ class SchedIsolator(Isolator):
         self._stored_config = None
 
     def get_available_cores(self) -> None:
-        self._available_cores = Isolator.available_cores()
+        self._available_cores = Isolator.recv_available_cores()
 
     def update_available_cores(self) -> None:
         Isolator.set_available_cores(self._available_cores)
@@ -302,21 +311,38 @@ class SchedIsolator(Isolator):
 
     def _update_other_values(self, action: str) -> None:
         logger = logging.getLogger(__name__)
+        self.sync_cur_steps()
+        for step in self._cur_steps.values():
+            self._allocated_cores += step
+        self._allocated_cores = tuple(set(self._allocated_cores))
+
+        logger.critical(f'[_update_other_values] self._allocated_cores: {self._allocated_cores}')
+        left = set(self._available_cores) - set(self._allocated_cores)
+        self._available_cores = tuple(left)
+        logger.critical(f'[_update_other_values] self._available_cores: {self._available_cores}')
+
         if action is "alloc":
-            logger.debug(f'[_update_other_values] self._available_cores: {self._available_cores}')
-            logger.debug(f'[_update_other_values] self._chosen_alloc: {self._chosen_alloc}')
+            logger.critical(f'[_update_other_values] self._available_cores: {self._available_cores}')
+            logger.critical(f'[_update_other_values] self._chosen_alloc: {self._chosen_alloc}')
             self._available_cores = tuple(filter(lambda x: x is not self._chosen_alloc, self._available_cores))
             self.update_available_cores()
             self._cur_alloc = None
             self._chosen_alloc = None
         elif action is "dealloc":
-            logger.debug(f'[_update_other_values] self._available_cores: {self._available_cores}')
-            logger.debug(f'[_update_other_values] self._chosen_dealloc: {self._chosen_dealloc}')
+            logger.critical(f'[_update_other_values] self._available_cores: {self._available_cores}')
+            logger.critical(f'[_update_other_values] self._chosen_dealloc: {self._chosen_dealloc}')
             self._available_cores = tuple(self._available_cores + (self._chosen_dealloc,))
             self.update_available_cores()
             self._cur_dealloc = None
             self._chosen_dealloc = None
 
     def sync_cur_steps(self) -> None:
+        logger = logging.getLogger(__name__)
+
+        for lc_wl in self._latency_critical_wls:
+            self._cur_steps[lc_wl] = lc_wl.orig_bound_cores
+        for be_wl in self._best_effort_wls:
+            self._cur_steps[be_wl] = be_wl.orig_bound_cores
+
         for wl, val in self._cur_steps.items():
             self._cur_steps[wl] = wl.bound_cores

@@ -33,7 +33,7 @@ class AffinityIsolator(Isolator):
             # FIXME: hard-coded part (core range)
             self._all_cores = tuple(range(0, 16, 1))
             self._MIN_CORES = 1
-        self._available_cores: Optional[Tuple[int]] = Isolator.available_cores()
+        self._available_cores: Optional[Tuple[int]] = Isolator.recv_available_cores()
         self._chosen_alloc: Optional[int] = None
         self._chosen_dealloc: Optional[int] = None
         self._cur_alloc: Optional[Tuple[int]] = None
@@ -146,8 +146,8 @@ class AffinityIsolator(Isolator):
 
     def get_available_cores(self) -> None:
         logger = logging.getLogger(__name__)
-        logger.info(f'[get_availble_cores] Isolator.available_cores(): {Isolator.available_cores()}')
-        self._available_cores = Isolator.available_cores()
+        logger.info(f'[get_availble_cores] Isolator.available_cores(): {Isolator.get_available_cores()}')
+        self._available_cores = Isolator.get_available_cores()
 
     def update_available_cores(self) -> None:
         logger = logging.getLogger(__name__)

@@ -15,13 +15,18 @@ from typing import Dict, List, Set, Type
 class State(IntEnum):
     GROW_CORES = 1
     GROW_LLC = 2
-    STOP_GROWTH = 3
+    GROW_FREQ = 3
+    START_GROWTH = 4
+    STOP_GROWTH = 5
 
 
 class HeraclesFunc:
     """
-    Class related to Hearcles controller function
+    Class related to Heracles controller function
     """
+    # TODO: hard-coded PEAK_LOAD for each workload
+    # img-dnn: 1800, xapian: 2200, sphinx: 8, masstree: 1000, moses: 200
+    _PEAK_LOAD = 8
 
     def __init__(self, interval: float, tail_latency: float, load: float, slo_target: float, file_path: str):
         self._interval: float = interval
@@ -32,6 +37,7 @@ class HeraclesFunc:
         self._last_num_line: int = -1            #
         self._latency_data = None
         self._be_growth = State.STOP_GROWTH
+        self._state_done = False                 # state_done : True means state decision is done in high-level controller
         self._group = None                                              # IsolationPolicy
         self._sub_controllers = []               # IsolationThread
         """
@@ -72,7 +78,7 @@ class HeraclesFunc:
         # FIXME: hard-coded for connecting remote host (currently using ip of bc3)
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect('147.46.240.242', username='dcslab', password='dcs%%*#')
+        ssh.connect('147.46.240.229', username='dcslab', password='dcs%%*#')
         read_cmd = 'cat '+self._file_path
         stdin, stdout, stderr = ssh.exec_command(read_cmd)
         logger.critical(f'[poll_lc_app_latency] ssh: {ssh}')
@@ -108,7 +114,10 @@ class HeraclesFunc:
         req_lat_idx = int(total_reqs*(float(1-percentile)))
         logger.critical(f'[calc_tail] total_reqs: {total_reqs}, req_lat_idx: {req_lat_idx}')
 
-        tail_val = sorted_lat[req_lat_idx]
+        if total_reqs is not 0:
+            tail_val = sorted_lat[req_lat_idx]
+        else:
+            tail_val = None
         return tail_val
 
     def poll_lc_app_load(self) -> float:
@@ -120,10 +129,11 @@ class HeraclesFunc:
         logger = logging.getLogger('heracles')
         # peak_qps = ????
         total_reqs = len(self._latency_data)
-        qps: float = float(total_reqs/self._interval)
+        qps: float = float(total_reqs/self._interval) # per second
         logger.critical(f'[poll_lc_app_load] total_reqs: {total_reqs}, qps: {qps}')
         # FIXME: qps should be adjusted!
-        self._load = qps
+        self._load = float(qps / self._PEAK_LOAD)     # ratio of two QPSes
+        logger.critical(f'[poll_lc_app_load] qps: {qps}, load: {self._load}')
         return qps
 
     @staticmethod
@@ -152,6 +162,7 @@ class HeraclesFunc:
         :return:
         """
         self._be_growth = State.STOP_GROWTH
+        self._state_done = True
 
     def allow_be_growth(self) -> None:
         """
@@ -159,6 +170,7 @@ class HeraclesFunc:
         :return:
         """
         self._be_growth = State.GROW_CORES
+        self._state_done = True
 
     @property
     def tail_latency(self) -> float:
@@ -179,6 +191,10 @@ class HeraclesFunc:
     @state.setter
     def state(self, new_state: State):
         self._be_growth = new_state
+
+    @property
+    def state_done(self) -> bool:
+        return self._state_done
 
     @property
     def group(self) -> IsolationPolicy:

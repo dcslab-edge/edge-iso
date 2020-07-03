@@ -28,9 +28,14 @@ class CacheIsolator(Isolator):
         num_be_wls = len(best_effort_wls)
 
         fair_bits = ResCtrl.MAX_BITS // num_all_wls     # f_b == 20 // 2 == 10
+        # FIXME: hard-coded for heracles algorithm (LC assignment 18 ways)
         lc_start_bit = ResCtrl.MIN_BITS - 1
-        lc_end_bit = fair_bits * num_lc_wls - 1         # (20//2) == 10 == 10 -> idx:9
+        lc_end_bit = 17
+        #lc_start_bit = ResCtrl.MIN_BITS - 1
+        #lc_end_bit = fair_bits * num_lc_wls - 1         # (20//2) == 10 == 10 -> idx:9
 
+        logger.critical(f'[__init__] num_all_wls: {num_all_wls}, num_lc_wls: {num_lc_wls}, num_be_wls: {num_be_wls}')
+        logger.critical(f'[__init__] latency_critical_wls: {latency_critical_wls}')
         for idx, wl in enumerate(latency_critical_wls):
             if idx > 1:
                 lc_start_bit = lc_end_bit + 1           # 10
@@ -48,8 +53,11 @@ class CacheIsolator(Isolator):
             logger.debug(f'[__init__] wl: {wl.name}, llc_masks: {llc_masks}, llc_ranges: {llc_ranges}, updated_masks: {updated_masks}')
             self._cur_steps[wl] = ResCtrl.get_llc_bit_ranges_from_mask(updated_masks)
 
-        be_start_bit = lc_end_bit + 1
-        be_end_bit = be_start_bit + fair_bits - 1
+        # FIXME: hard-coded for heracles algorithm (BE assignment two ways)
+        #be_start_bit = lc_end_bit + 1
+        #be_end_bit = be_start_bit + fair_bits - 1
+        be_start_bit = 18
+        be_end_bit = be_start_bit + 1
         logger.debug(f'[__init__] lc_end_bit: {lc_end_bit}, be_start_bit: {be_start_bit}, fair_bits: {fair_bits}')
         for idx, wl in enumerate(best_effort_wls):
             if idx > 1:
@@ -103,10 +111,12 @@ class CacheIsolator(Isolator):
         logger = logging.getLogger(__name__)
 
         wl = self.dealloc_target_wl
+        logger.critical(f"[cache:strengthen] self.dealloc_target_wl : {wl}")
         #self.sync_cur_steps()
         if wl is not None:
-            logger.info(f"It can deallocate {wl.name}-{wl.pid}")
-            logger.info(f"self.dealloc_target_wl : {wl}")
+            logger.critical(f"[cache:strengthen] It can deallocate {wl.name}-{wl.pid}")
+            logger.critical(f"[cache:strengthen] self.dealloc_target_wl : {wl}")
+            logger.critical(f"[cache:strengthen] self._cur_steps[wl] : {self._cur_steps[wl]}")
 
             self._chosen_dealloc = self.release_llc_bit(self._cur_steps[wl])
             #logger.critical(f'self._chosen_dealloc: {self._chosen_dealloc}')
@@ -139,18 +149,20 @@ class CacheIsolator(Isolator):
 
         wl = self.alloc_target_wl
         #self.sync_cur_steps()
+        logger.critical(f"[cache:weaken] self.alloc_target_wl : {wl}")
         if wl is not None:
-            logger.info(f"It can allocate {wl.name}-{wl.pid}")
-            logger.info(f"self.alloc_target_wl : {wl}")
+            logger.critical(f"[cache:weaken] It can allocate {wl.name}-{wl.pid}")
+            logger.critical(f"[cache:weaken] self.alloc_target_wl : {wl}")
+            logger.critical(f"[cache:weaken] self._cur_steps[wl] : {self._cur_steps[wl]}")
 
             self._chosen_alloc = self.get_free_llc_bit(self._cur_steps[wl])
-            #logger.critical(f'self._chosen_alloc: {self._chosen_alloc}')
+            logger.critical(f'[cache:weaken] self._chosen_alloc: {self._chosen_alloc}')
             if self._chosen_alloc >= 0:
                 chosen_alloc_bin = format(1 << (19 - self._chosen_alloc), '020b')
             else:
                 chosen_alloc_bin = format(0, '020b')
             #logger.info(f"self._chosen_alloc : {self._c}")
-            logger.info(f"[weaken:cache] self._chosen_alloc : {self._cur_alloc}, chosen_alloc_binary: {chosen_alloc_bin}, "
+            logger.info(f"[cache:weaken] self._chosen_alloc : {self._cur_alloc}, chosen_alloc_binary: {chosen_alloc_bin}, "
                             f"self.alloc_target_wl: {wl.name}")
             # self._cur_steps[wl] : [[0, 19],[0, 19]], self._chosen_alloc: 1
             # FIXME: hard-coded for socket 0 (i.e., masks[0])
@@ -158,7 +170,7 @@ class CacheIsolator(Isolator):
             masks[0] = hex(int(masks[0], 16) | int(chosen_alloc_bin, 2))
             self._cur_alloc = masks   # Bitwise op: OR
 
-            logger.critical(f"[weaken:cache] self._cur_alloc : {self._cur_alloc}, self.alloc_target_wl: {wl.name}")
+            logger.critical(f"[cache:weaken] self._cur_alloc : {self._cur_alloc}, self.alloc_target_wl: {wl.name}")
         elif wl is None:
             logger.info(f"There is no alloc_target_wl. (No workload)")
             logger.info(f"self.alloc_target_wl : {wl}")
@@ -193,7 +205,10 @@ class CacheIsolator(Isolator):
         if self.alloc_target_wl is None:
             return False
         else:
-            return self.get_free_llc_bit(self._cur_steps[self.alloc_target_wl]) < 0
+            deallocable_ranges = self._cur_steps[self.dealloc_target_wl]
+            deallocable_ranges_len = deallocable_ranges[0][1] - deallocable_ranges[0][0]
+            return self.get_free_llc_bit(self._cur_steps[self.alloc_target_wl]) < 0 and deallocable_ranges_len == 1
+            #return self.get_free_llc_bit(self._cur_steps[self.alloc_target_wl]) < 0     # free bit이 없으면, alloc할 수 없으니 min_level True?
 
     def enforce(self) -> None:
         logger = logging.getLogger(__name__)
@@ -227,6 +242,8 @@ class CacheIsolator(Isolator):
                 self._update_other_values("dealloc")
 
     def reset(self) -> None:
+        logger = logging.getLogger(__name__)
+        logger.critical(f'[reset] CacheIsolator reset!')
         masks = [ResCtrl.MIN_MASK] * (max(numa_topology.cur_online_nodes()) + 1)
 
         for be_wl in self._best_effort_wls:
@@ -262,14 +279,15 @@ class CacheIsolator(Isolator):
         llc_range = wl_llc_ranges[0]
         s, e = llc_range[0], llc_range[1]
         candidate_bits = [s - ResCtrl.STEP, e + ResCtrl.STEP]   # ResCtrl.STEP == 1
-
-        logger.debug(f'[get_free_llc_bit] self._free_llc_range[0]: {self._free_llc_ranges[0]}, candidate_bits: {candidate_bits}')
+        logger.critical(f'[get_free_llc_bit] self._cur_steps: {self._cur_steps}')
+        logger.critical(f'[get_free_llc_bit] self._free_llc_range[0]: {self._free_llc_ranges[0]}, candidate_bits: {candidate_bits}')
 
         if candidate_bits[0] > 0 and candidate_bits[0] in self._free_llc_ranges[0]:
             free_bit = candidate_bits[0]
         elif candidate_bits[1] < 19 and candidate_bits[1] in self._free_llc_ranges[0]:
             free_bit = candidate_bits[1]
 
+        logger.critical(f'[get_free_llc_bit] free_bit: {free_bit}')
         return free_bit
 
     def release_llc_bit(self, wl_llc_ranges: List[List[int]]) -> int:
@@ -280,41 +298,65 @@ class CacheIsolator(Isolator):
         # FIXME: return llc_ranges in `socket 0`
         llc_range = wl_llc_ranges[0]
         s, e = llc_range[0], llc_range[1]
-        candidate_bits = [s, e]
+        candidate_bits = [s, e]                 # dealloc workload's bits
 
         # wl_llc_ranges : dealloc_target_wl
         # alloc_target_wl :
         # FIXME: what if self.alloc_target_wl is None? \
         #  (Assuming that an LC workload can be determined to self.alloc_target_wl
-        lc_wls: Set[Workload] = self._latency_critical_wls
-        sorted_lc_wls = sorted(lc_wls, key=lambda x: x.calc_metric_diff().llc_hit_ratio, reverse=True)
-        wl_alloc = sorted_lc_wls[0]
+        lc_wls = set()
+        logger.critical(f'[release_llc_bit] self._cur_steps: {self._cur_steps}')
+        for wl, _ in self._cur_steps.items():
+            if wl.wl_type == "LC":
+                lc_wls.add(wl)
+        #lc_wls: Set[Workload] = self._latency_critical_wls
+        logger.critical(f'[release_llc_bit] lc_wls: {lc_wls}')
+        wl_alloc = self.alloc_target_wl
+        if wl_alloc is not None:
+            # FIXME: hard-coded for two workload scenario (1 LC , 1 BE)
+            #sorted_lc_wls = sorted(lc_wls, key=lambda x: x.calc_metric_diff().llc_hit_ratio, reverse=True)
+            #sorted_lc_wls = list(lc_wls)
+            #logger.critical(f'[release_llc_bit] sorted_lc_wls: {sorted_lc_wls}')
+            #wl_alloc = sorted_lc_wls[0]
+            #wl_alloc = self.alloc_target_wl
 
-        alloc_target_llc_range = self._cur_steps[wl_alloc][0]
-        a_s = alloc_target_llc_range[0]
-        a_e = alloc_target_llc_range[1]
+            alloc_target_llc_range = self._cur_steps[wl_alloc][0]
+            a_s = alloc_target_llc_range[0]
+            a_e = alloc_target_llc_range[1]
 
-        logger.debug(f'[release_llc_bit] self._cur_steps: {self._cur_steps}')
-        logger.debug(f'[release_llc_bit] alloc_target_llc_range: {alloc_target_llc_range}, wl_alloc: {wl_alloc}')
-        logger.debug(f'[release_llc_bit] candidate_bits: {candidate_bits}')
+            logger.critical(f'[release_llc_bit] self._cur_steps: {self._cur_steps}')
+            logger.critical(f'[release_llc_bit] alloc_target_llc_range(a_s, a_e): {alloc_target_llc_range}, wl_alloc: {wl_alloc}')
+            logger.critical(f'[release_llc_bit] candidate_bits: {candidate_bits}')
 
-        if candidate_bits[0] > a_e:         # if wl occupies right side of `alloc_target_wl'
-            release_bit = candidate_bits[0]
-        elif candidate_bits[1] < a_s:       # if wl occupies left side of `alloc_target_wl'
-            release_bit = candidate_bits[1]
+            if candidate_bits[0] >= a_e:         # if wl occupies right side of `alloc_target_wl'
+                release_bit = candidate_bits[0]
+            elif candidate_bits[1] <= a_s:       # if wl occupies left side of `alloc_target_wl'
+                release_bit = candidate_bits[1]
+
         return release_bit
 
     def _update_other_values(self, action: str) -> None:
         logger = logging.getLogger(__name__)
         if action is "alloc":
             updated_free_masks = []
-            logger.debug(f'[_update_other_values] self._free_llc_ranges: {self._free_llc_ranges}')
+            logger.critical(f'[_update_other_values] self._free_llc_ranges: {self._free_llc_ranges}')
             free_masks = ResCtrl.get_llc_mask_from_ranges(self._free_llc_ranges)
-            logger.debug(f'[_update_other_values] free_masks: {free_masks}')
-            logger.debug(f'[_update_other_values] self._cur_alloc: {self._cur_alloc}')
+            logger.critical(f'[_update_other_values] free_masks: {free_masks}')
+            logger.critical(f'[_update_other_values] self._chosen_alloc: {self._chosen_alloc}')
+            #logger.critical(f'[_update_other_values] self._cur_alloc: {self._cur_alloc}')
+            if self._chosen_alloc >= 0:
+                chosen_alloc_bin = format(1 << (19 - self._chosen_alloc), '020b')
+            else:
+                chosen_alloc_bin = format(0, '020b')
+            logger.critical(f'[_update_other_values] self._cur_alloc: {self._cur_alloc}')
             for idx, mask in enumerate(free_masks):     # 111 ^ 101 -> 010
-                updated_mask = hex(int(mask, 16) ^ int(self._cur_alloc[idx], 16))
-                updated_free_masks.append(updated_mask)
+                if idx == 0:
+                    updated_mask = hex(int(mask, 16) ^ int(chosen_alloc_bin, 2))
+                    updated_free_masks.append(updated_mask)
+                elif idx > 0:
+                    chosen_alloc_bin = format(0, '020b')
+                    updated_mask = hex(int(mask, 16) ^ int(chosen_alloc_bin, 2))
+                    updated_free_masks.append(updated_mask)
 
             logger.critical(f'[_update_other_values] updated_free_masks: {updated_free_masks}')
             self._free_llc_ranges = ResCtrl.get_llc_bit_ranges_from_mask(updated_free_masks)
@@ -322,15 +364,26 @@ class CacheIsolator(Isolator):
             self._chosen_alloc = None
         elif action is "dealloc":
             updated_free_masks = []
-            logger.debug(f'[_update_other_values] self._free_llc_ranges: {self._free_llc_ranges}')
+            logger.critical(f'[_update_other_values] self._free_llc_ranges: {self._free_llc_ranges}')
             free_masks = ResCtrl.get_llc_mask_from_ranges(self._free_llc_ranges)
-            logger.debug(f'[_update_other_values] free_masks: {free_masks}')
-            logger.debug(f'[_update_other_values] self._cur_dealloc: {self._cur_dealloc}')
-            for idx, mask in enumerate(free_masks):     # 010 | 101 -> 111
-                updated_mask = hex(int(mask, 16) | int(self._cur_dealloc[idx], 16))
-                updated_free_masks.append(updated_mask)
+            logger.critical(f'[_update_other_values] free_masks: {free_masks}')
+            logger.critical(f'[_update_other_values] self._chosen_dealloc: {self._chosen_dealloc}')
+            if self._chosen_dealloc >= 0:
+                chosen_dealloc_bin = format(1 << (19 - self._chosen_dealloc), '020b')
+            else:
+                chosen_dealloc_bin = format(0, '020b')
+            logger.critical(f'[_update_other_values] self._cur_dealloc: {self._cur_dealloc}')
+            for idx, mask in enumerate(free_masks):     # 010 | 101 -> 111 , 000 ^ 101 -> 101
+                # FIXME: hard-coded for socket 0
+                if idx == 0:
+                    updated_mask = hex(int(mask, 16) | int(chosen_dealloc_bin, 2))
+                    updated_free_masks.append(updated_mask)
+                elif idx > 0:
+                    chosen_dealloc_bin = format(0, '020b')
+                    updated_mask = hex(int(mask, 16) | int(chosen_dealloc_bin, 2))
+                    updated_free_masks.append(updated_mask)
 
-            logger.debug(f'[_update_other_values] updated_free_masks: {updated_free_masks}')
+            logger.critical(f'[_update_other_values] updated_free_masks: {updated_free_masks}')
             self._free_llc_ranges = ResCtrl.get_llc_bit_ranges_from_mask(updated_free_masks)
             self._cur_dealloc = None
             self._chosen_dealloc = None

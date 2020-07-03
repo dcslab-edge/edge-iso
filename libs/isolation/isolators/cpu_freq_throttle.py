@@ -23,7 +23,7 @@ class CPUFreqThrottleIsolator(Isolator):
         for wl in latency_critical_wls:
             self._cur_steps[wl] = CPUDVFS.MAX_IDX
         for wl in best_effort_wls:
-            self._cur_steps[wl] = CPUDVFS.MAX_IDX
+            self._cur_steps[wl] = CPUDVFS.MIN_IDX       # FIXME: Heracles's be workloads' freq starts with the lowest freq.
         self._stored_config: Optional[Dict[Workload, int]] = None
         self._cpufreq_range = CPUDVFS.get_freq_range()
 
@@ -48,7 +48,7 @@ class CPUFreqThrottleIsolator(Isolator):
     def is_max_level(self) -> bool:
         # FIXME: hard coded
         logger = logging.getLogger(__name__)
-        logger.info(f'[is_max_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
+        logger.critical(f'[is_max_level] self.dealloc_target_wl: {self.dealloc_target_wl}')
         if self.dealloc_target_wl is None:
             return False
         else:
@@ -58,11 +58,13 @@ class CPUFreqThrottleIsolator(Isolator):
     def is_min_level(self) -> bool:
         # FIXME: hard coded
         logger = logging.getLogger(__name__)
-        logger.info(f'[is_min_level] self.alloc_target_wl: {self.alloc_target_wl}')
+        logger.critical(f'[is_min_level] self.alloc_target_wl: {self.alloc_target_wl}')
         if self.alloc_target_wl is None:
             return False
         else:
-            return CPUDVFS.MAX_IDX < self._cur_steps[self.alloc_target_wl] + CPUDVFS.STEP_IDX
+            cur_dvfs_idx = self._cur_steps[self.alloc_target_wl]
+            logger.critical(f'[is_min_level] self._cur_steps[self.alloc_target_wl]: {cur_dvfs_idx}')
+            return CPUDVFS.MAX_IDX < cur_dvfs_idx + CPUDVFS.STEP_IDX
 
     def enforce(self) -> None:
         # logger = logging.getLogger(__name__)

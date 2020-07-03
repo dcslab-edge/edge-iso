@@ -32,7 +32,7 @@ class Controller:
     def __init__(self, metric_buf_size: int, binding_cores: Set[int]) -> None:
         self._pending_queue: PendingQueue = PendingQueue(XeonWViolationPolicy)
 
-        self._interval: float = 15.0  # scheduling interval (sec)
+        self._interval: float = 5.0  # scheduling interval (sec)
         self._profile_interval: float = 1.0  # check interval for phase change (sec)
         self._solorun_interval: float = 2.0  # the FG's solorun profiling interval (sec)
         self._solorun_count: Dict[IsolationPolicy, Optional[int]] = dict()
@@ -44,7 +44,7 @@ class Controller:
 
         self._polling_thread = PollingThread(metric_buf_size, self._pending_queue)
 
-        self._isolation_threads = (IsolationThread(SchedIsolator(set(), set())),)#,null set
+        #self._isolation_threads = (IsolationThread(SchedIsolator(set(), set())),)#,null set
                                    #IsolationThread(CacheIsolator),
                                    #IsolationThread(CPUFreqThrottleIsolator))
 
@@ -54,11 +54,20 @@ class Controller:
         #self._cpuset.create_group()
         #self._cpuset.assign_cpus(binding_cores)
         # FIXME: hard-coded file path for reading latency (heracles)
-        lat_file_path = '/home/dcslab/ysnam/benchmarks/tailbench/tailbench/harness/heracles_latency.txt'
+        # TODO: hard-coded SLO setting (seconds@QPS)
+        # [99p latency@70% of Peak QPS (High Load)]
+        #   img-dnn: 0.0117@1260, xapian: 0.005@1540, sphinx: 2@5.6, masstree: 0.016@700, moses: 0.149@140
+        # [SLO-threshold] 1.25x, 1.5x, 2x slowdown of 99p latency (unit: seconds)
+        #   img-dnn: 0.015, 0.018, 0.023
+        #   xapian: 0.006, 0.007, 0.010
+        #   sphinx: 2.540, 3.047, 4.063
+        #   masstree: 0.020, 0.024, 0.032
+        #   moses: 0.186, 0.223, 0.297
+        lat_file_path = '/home/dcslab/ysnam/benchmarks/tailbench/tailbench/harness/heracles_latency.txt' # client-side (bc4)
         self._heracles = HeraclesFunc(interval=self._interval,        # 15 seconds
                                       tail_latency=0.0,
                                       load=0.0,
-                                      slo_target=0.003,               # 0.0025s(2.5ms)*1.2 == 3ms or 0.0045s (4.5ms) * 0.7 = 3.15ms
+                                      slo_target=3.047,               # seconds
                                       file_path=lat_file_path)
         # Swapper init
         # self._swapper: SwapIsolator = SwapIsolator(self._isolation_groups)
@@ -83,21 +92,28 @@ class Controller:
                 latency = heracles.tail_latency
                 load = heracles.load                # currently, QPS
                 target = heracles.slo_taget
-                slack: float = (target-latency)/target
+                if latency is not None:
+                    slack: float = (target-latency)/target
+                else:
+                    slack = 0.0
                 logger.critical(f'[_isolate_workloads] slack: {slack}, load: {load}, target: {target}, latency: {latency}')
                 if latency is not None and load is not None:
                     if slack < 0:
                         # FIXME: hard-coded for single best-effort workloads
                         HeraclesFunc.disable_be_wls(group.best_effort_workloads)
                         heracles.state = State.STOP_GROWTH
+                        heracles._state_done = True
                         logger.critical(f'[_isolate_workloads] slack < 0 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
                         # EnterCooldown()
                     elif load > 0.85:
                         HeraclesFunc.disable_be_wls(group.best_effort_workloads)
                         heracles.state = State.STOP_GROWTH
+                        heracles._state_done = True
                         logger.critical(f'[_isolate_workloads] load > 0.85 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
                     elif load < 0.8:
                         heracles.enable_be_wls(group.best_effort_workloads)
+                        heracles.state = State.START_GROWTH
+                        heracles._state_done = False
                         logger.critical(f'[_isolate_workloads] load < 0.8 case, slack: {slack}, load: {load}, heracles.state: {heracles.state}')
                     elif slack < 0.1:
                         heracles.disallow_be_growth()
@@ -112,6 +128,8 @@ class Controller:
                                 cur_isolator.dealloc_target_wl = be_wl
                                 cur_isolator.strengthen()
                                 cur_isolator.enforce()
+                    else:
+                        heracles._state_done = False
                 else:
                     logger.critical(f'[_isolate_workloads] latency and load information is not enough!')
                     logger.critical(f'[_isolate_workloads] 99p tail latency: {latency}, load: {load}')
@@ -144,6 +162,9 @@ class Controller:
             if pending_group is not None:
                 self._heracles.group = pending_group
                 logger.critical(f'[_register_pending_workloads] self._heracles.group: {self._heracles.group}')
+                for isolator in self._heracles.group._isolator_map.values():
+                    self._heracles._sub_controllers.append(IsolationThread(isolator))
+                #self._heracles._sub_controllers = self._heracles.group._isolator_map.values()
                 for sub_con in self._heracles.sub_controllers:
                     sub_con.group = pending_group
                     logger.critical(f'[_register_pending_workloads] sub_con.group: {sub_con.group}')
@@ -180,8 +201,8 @@ class Controller:
         self._cpuset.assign_cpus(self._binding_cores)
 
         self._polling_thread.start()            # running in background
-        for sub_controller in self._isolation_threads:
-            self._heracles.sub_controllers.append(sub_controller)
+        #for sub_controller in self._isolation_threads:
+        #    self._heracles.sub_controllers.append(sub_controller)
 
         logger = logging.getLogger(__name__)
         logger.critical('[controller:run] starting isolation loop')
