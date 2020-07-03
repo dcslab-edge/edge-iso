@@ -1,0 +1,15 @@
+{
+	"name": "ntail-masstree",
+	"runtime": 32.00610089302063,
+	"llc_references": 7810076.821428571,
+	"llc_misses": 1105043.1785714286,
+	"instructions": 411831888.71428573,
+	"cycles": 706111987.6071429,
+	"stall_cycles": 368571622.53571427,
+	"intra_coh": 910640.0714285714,
+	"inter_coh": 66.39285714285714,
+	"wall_cycles": 2108577860.6785715,
+	"llc_size": 191774720,
+	"local_mem": 88653824,
+	"remote_mem": 416621.71428571426
+}

@@ -1,0 +1,15 @@
+{
+	"name": "dedup",
+	"runtime": 8.892660856246948,
+	"llc_references": 26974574.375,
+	"llc_misses": 8918778.375,
+	"instructions": 13757506041.5,
+	"cycles": 7561676866.875,
+	"stall_cycles": 1768293559.875,
+	"intra_coh": 2421549.75,
+	"inter_coh": 1.875,
+	"wall_cycles": 2133357492.875,
+	"llc_size": 166780928,
+	"local_mem": 1133813760,
+	"remote_mem": 3325952
+}
